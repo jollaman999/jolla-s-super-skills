@@ -12,16 +12,28 @@ Claude Code 개인 skill 과 전역 작업 규칙.
 
 ## verify-impl 팀 구성
 
-팀장(SKILL.md)은 오케스트레이션과 사람과의 대화만 하고, 탐색·실행·반증은 팀원이 병렬로 한다.
+팀장(SKILL.md)은 경로 판정, 사람과의 대화, 판단, 종합만 하고 탐색·실행·반증·진단은 팀원 8명이 병렬로 한다.
 
-| 팀원 | 담당 | 병렬 |
-|------|------|------|
-| `verify-inventory` | 기능 인벤토리 | `verify-target-scout` 와 동시 |
-| `verify-target-scout` | 접속 대상·프론트 탐색 | `verify-inventory` 와 동시 |
-| `verify-host` | 호스트 한 대 전담 검증 | 호스트 수만큼 동시 |
-| `verify-refuter` | pass 판정 반증 | pass 항목 수만큼 동시 |
+| 팀원 | 담당 노드 | 병렬 단위 |
+|------|-----------|-----------|
+| `verify-inventory` | A 기능 인벤토리 | ★1 |
+| `verify-target-scout` | B 접속 대상·프론트 탐색 | ★1 |
+| `verify-crosscheck` | X 구현↔스펙 대조 | ★1.5 (C와 동시) |
+| `verify-host` | F 호스트 전담 검증 | ★2 호스트 수만큼 |
+| `verify-frontend` | F 프론트↔백엔드 연계 | ★2 |
+| `verify-refuter` | F′ pass 판정 반증 | ★3 pass 수만큼 |
+| `verify-diagnoser` | H fail 원인 추적 | ★4 fail 수만큼 |
+| `verify-differ` | H 호스트 간 차이 원인 | ★4 갈린 항목 수만큼 |
 
-심볼릭 링크라 이 repo 를 고치면 즉시 반영된다.
+### 경로 판정
+
+세션 3,240건 측정 결과 프롬프트 중앙값이 40자이고 65%가 60자 미만이다.
+짧은 단발 확인에 풀코스를 돌리지 않도록 P 노드가 `light` / `full` 을 판정한다. 기준 → `verify-impl/references/routing.md`
+
+### 진단과 루프
+
+fail 은 보고로 끝나지 않고 H 에서 원인까지 추적한다. **진단만 하고 고치지는 않는다.**
+사용자가 수정한 뒤에는 R 이 실패 항목만 재검증한다 (배포 반영 확인 후, 상한 3회).
 
 ## 새 머신에 설치
 
