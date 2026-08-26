@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# pre-commit 훅을 대상 repo 에 설치한다. 기존 훅이 있으면 체인해서 안 깨뜨린다.
+# pre-commit + commit-msg 훅을 대상 repo 에 설치한다. 기존 훅이 있으면 체인해서 안 깨뜨린다.
 #
 # usage: install-hooks.sh <repo> [public|private]
 #   프로필을 안 주면 gh 로 공개 여부를 확인해 정한다. 확인 불가면 private.
-#     public  = 시크릿 + 내부 조직명 + 사설IP + em dash 차단
+#     public  = 시크릿 + 내부 조직명 + 사설IP 차단
 #     private = 시크릿(비밀번호·토큰·개인키)만 차단
+#   em dash 와 커밋 메시지 규칙은 프로필과 무관하게 항상 검사한다.
 set -uo pipefail
-SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/pre-commit"
+SRCDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DIR="${1:?usage: install-hooks.sh <repo> [public|private]}"
 WANT="${2:-}"
 
@@ -30,32 +31,39 @@ if [ -z "$WANT" ]; then
 fi
 case "$WANT" in public|private) ;; *) echo "프로필은 public 또는 private" >&2; exit 2 ;; esac
 
-# --- 기존 훅 보존 ---
-TARGET="$HOOKS/pre-commit"
-if [ -e "$TARGET" ] && [ ! -L "$TARGET" ]; then
-  if grep -q 'skills/hooks/pre-commit' "$TARGET" 2>/dev/null; then
-    echo "  이미 체인돼 있음"
-  else
-    cp "$TARGET" "$HOOKS/pre-commit.orig"
-    cat > "$TARGET" <<CHAIN
+# --- 설치 (기존 훅이 있으면 보존해서 체인) ---
+install_hook() { # <훅이름>
+  local name="$1" src="$SRCDIR/$1" target="$HOOKS/$1"
+  [ -f "$src" ] || { echo "  원본 없음, 건너뜀: $name" >&2; return; }
+  if [ -e "$target" ] && [ ! -L "$target" ]; then
+    if grep -q "skills/hooks/$name" "$target" 2>/dev/null; then
+      echo "  $name: 이미 체인돼 있음"
+    else
+      cp "$target" "$HOOKS/$name.orig"
+      cat > "$target" <<CHAIN
 #!/usr/bin/env bash
-# 원래 훅 먼저, 그다음 시크릿 검사 (skills/hooks/pre-commit)
-"\$(dirname "\$0")/pre-commit.orig" "\$@" || exit \$?
-exec "$SRC" "\$@"
+# 원래 훅 먼저, 그다음 skills/hooks/$name
+"\$(dirname "\$0")/$name.orig" "\$@" || exit \$?
+exec "$src" "\$@"
 CHAIN
-    chmod +x "$TARGET"
-    echo "  기존 훅 보존 -> pre-commit.orig 로 옮기고 체인"
+      chmod +x "$target"
+      echo "  $name: 기존 훅 보존 -> $name.orig 로 옮기고 체인"
+    fi
+  elif [ -L "$target" ]; then
+    ln -sfn "$src" "$target"; echo "  $name: 링크 갱신"
+  else
+    ln -sfn "$src" "$target"; echo "  $name: 링크 생성"
   fi
-elif [ -L "$TARGET" ]; then
-  ln -sfn "$SRC" "$TARGET"; echo "  링크 갱신"
-else
-  ln -sfn "$SRC" "$TARGET"; echo "  링크 생성"
-fi
+}
+
+install_hook pre-commit
+install_hook commit-msg
 
 printf '%s\n' "$WANT" > "$HOOKS/.profile"
 echo "설치 완료: $DIR"
-echo "  훅:     $TARGET"
+echo "  훅:     $HOOKS/{pre-commit,commit-msg}"
 echo "  프로필: $WANT"
 [ "$WANT" = private ] && echo "  -> 비밀번호·토큰·개인키만 차단합니다"
-[ "$WANT" = public ]  && echo "  -> 시크릿 + 내부 조직명 + 사설IP + em dash 를 차단합니다"
-echo "  해제:   rm $TARGET $HOOKS/.profile"
+[ "$WANT" = public ]  && echo "  -> 시크릿 + 내부 조직명 + 사설IP 를 차단합니다"
+echo "  -> em dash 와 커밋 메시지 규칙은 프로필과 무관하게 검사합니다"
+echo "  해제:   rm $HOOKS/pre-commit $HOOKS/commit-msg $HOOKS/.profile"

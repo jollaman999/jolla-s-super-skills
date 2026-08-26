@@ -6,6 +6,7 @@
 # 프로필 - repo 의 .git/hooks/.profile 파일 또는 HOOK_PROFILE 로 지정
 #   public  : 시크릿 + 내부 조직명 + 사설/공인 IP 전부 차단 (공개 repo)
 #   private : 시크릿(비밀번호·토큰·키)만 차단 (사내/비공개 repo)
+# em dash 는 프로필과 무관하게 항상 차단한다.
 # 미지정이면 remote 주소로 자동 판별하고, 애매하면 private 로 간다 (오탐 최소화).
 set -uo pipefail
 FAIL=0
@@ -23,7 +24,7 @@ red(){ printf '\033[31m%s\033[0m\n' "$*"; }
 
 # 훅 자신은 검사 대상에서 뺀다 - 탐지 패턴이 곧 금지 문자열이라 자기를 차단한다.
 # 다른 예외를 추가하려면 정말 필요한지 먼저 따진다.
-staged=$(git diff --cached --name-only --diff-filter=ACM | grep -vE '^hooks/pre-commit$')
+staged=$(git diff --cached --name-only --diff-filter=ACM | grep -vE '^hooks/(pre-commit|commit-msg)$')
 [ -z "$staged" ] && exit 0
 
 check() { # <라벨> <정규식> <설명>
@@ -78,8 +79,8 @@ if [ -n "$ips" ]; then
 fi
 fi
 
-# em dash - public 프로필만 (문서 repo 대상)
-if [ "$PROFILE" = public ] && git diff --cached --unified=0 -- $staged 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+' | grep -q '—'; then
+# em dash - 프로필 무관. 시크릿이 아니라 표기 규칙이라 공개/비공개가 갈릴 이유가 없다.
+if git diff --cached --unified=0 -- $staged 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+' | grep -q '—'; then
   red "차단: em dash(—) 사용"
   echo "    -> 하이픈(-)으로 바꾸세요"
   FAIL=1

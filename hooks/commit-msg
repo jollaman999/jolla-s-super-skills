@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# 커밋 메시지 표기 규칙 검사. CLAUDE.md 의 "커밋 메시지" 절을 강제한다.
+# 설치: hooks/install-hooks.sh <repo>
+# 우회: git commit --no-verify  (정말 필요할 때만)
+#
+# 프로필을 안 가린다. 시크릿이 아니라 표기 규칙이라 공개/비공개가 갈릴 이유가 없다.
+#
+# 검사 항목
+#   - Co-Authored-By 금지
+#   - AI 생성 문구 금지
+#   - em dash 금지 (제목·본문 전부)
+#   - 제목 뒤 ' - ' / ' — ' 부연 금지  (부연은 본문에 쓴다)
+#   - 제목과 본문 사이 빈 줄  (없으면 %s 가 본문까지 먹는다)
+#
+# 본문 자체는 막지 않는다. 부연이 필요하면 본문에 쓴다.
+set -uo pipefail
+MSGFILE="${1:?usage: commit-msg <파일>}"
+FAIL=0
+red(){ printf '\033[31m%s\033[0m\n' "$*"; }
+
+# 주석줄과 scissors(--verbose 로 붙는 diff) 아래는 커밋에 안 들어가므로 뺀다.
+BODY=$(sed -e '/^# *-\{1,\} *>8 *-\{1,\}/,$d' -e '/^#/d' "$MSGFILE")
+# 앞뒤 빈 줄 제거
+BODY=$(printf '%s\n' "$BODY" | sed -e '/./,$!d' | tac | sed -e '/./,$!d' | tac)
+[ -z "$BODY" ] && exit 0   # 빈 메시지는 git 이 알아서 막는다
+
+SUBJ=$(printf '%s\n' "$BODY" | head -1)
+LINE2=$(printf '%s\n' "$BODY" | sed -n '2p')
+NLINES=$(printf '%s\n' "$BODY" | wc -l)
+
+# 자동 생성 제목은 제목 규칙에서 뺀다. 남의 커밋 제목을 그대로 인용하는 것이라
+# 거기 들어 있는 ' - ' 는 내가 붙인 부연이 아니다.
+SKIP_SUBJ=0
+case "$SUBJ" in
+  'Revert "'*|'Merge '*|'fixup! '*|'squash! '*|'Reapply "'*) SKIP_SUBJ=1 ;;
+esac
+
+# --- 메시지 전체 대상 ---
+if printf '%s\n' "$BODY" | grep -qi '^Co-Authored-By:'; then
+  red "차단: Co-Authored-By"
+  echo "    -> 이 줄을 지우세요"
+  FAIL=1
+fi
+
+if printf '%s\n' "$BODY" | grep -qiE 'Generated with \[?Claude Code|Co-authored-by: Claude|🤖'; then
+  red "차단: AI 생성 문구"
+  echo "    -> 해당 줄을 지우세요"
+  FAIL=1
+fi
+
+if printf '%s\n' "$BODY" | grep -q '—'; then
+  red "차단: em dash(—)"
+  printf '%s\n' "$BODY" | grep -n '—' | head -3 | sed 's/^/    /'
+  echo "    -> 하이픈(-)으로 바꾸세요"
+  FAIL=1
+fi
+
+# --- 제목 대상 ---
+if [ "$SKIP_SUBJ" -eq 0 ] && printf '%s' "$SUBJ" | grep -qE ' [-—] .+$'; then
+  red "차단: 제목 뒤에 '-' 로 부연을 이어붙임"
+  echo "    $SUBJ"
+  echo "    -> 부연은 제목에서 떼고 본문(빈 줄 다음)에 쓰세요"
+  FAIL=1
+fi
+
+# --- 본문 구분 ---
+if [ "$NLINES" -gt 1 ] && [ -n "$LINE2" ]; then
+  red "차단: 제목과 본문 사이에 빈 줄이 없음"
+  echo "    -> 제목 다음 줄을 비우세요. 안 그러면 git 이 2번째 줄까지 제목으로 봅니다"
+  FAIL=1
+fi
+
+if [ $FAIL -ne 0 ]; then
+  echo
+  red "커밋을 중단했습니다. 메시지를 고친 뒤 다시 커밋하세요."
+  echo "정말 의도한 것이면: git commit --no-verify"
+  exit 1
+fi
+exit 0

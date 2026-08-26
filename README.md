@@ -10,8 +10,8 @@ Claude Code 개인 skill 과 전역 작업 규칙.
 | `verify-impl/` | `~/.claude/skills/verify-impl` (심볼릭 링크) | 소스 기능 파악 후 실노드 SSH 또는 로컬 구동으로 실증 검증 |
 | `agents/` | `~/.claude/agents/` (파일별 심볼릭 링크) | verify-impl 이 부리는 전문 서브에이전트 8종 |
 | `deploy-verify/` | `~/.claude/skills/deploy-verify` | 빌드 → 커밋 → 전송 → 재기동 → 반영 확인 → 실증 |
-| `shared/` | `~/.claude/skills/shared` | 동시 세션 감지와 스냅샷. 두 skill 이 같이 쓴다 |
-| `hooks/` | 각 repo `.git/hooks/` | 시크릿 커밋 차단. 프로필 2종, 기존 훅 체인 보존 |
+| `shared/` | `~/.claude/skills/shared` | 동시 세션 감지, 스냅샷, repo 스타일 프로파일링 |
+| `hooks/` | 각 repo `.git/hooks/` | 시크릿 커밋 차단 + 커밋 메시지 규칙. 기존 훅 체인 보존 |
 
 ## verify-impl 팀 구성
 
@@ -43,6 +43,24 @@ Claude Code 개인 skill 과 전역 작업 규칙.
 fail 은 보고로 끝나지 않고 H 에서 원인까지 추적한다. **진단만 하고 고치지는 않는다.**
 사용자가 수정한 뒤에는 R 이 실패 항목만 재검증한다 (배포 반영 확인 후, 상한 3회).
 
+## repo 프로필
+
+`CLAUDE.md` 는 "그 repo 에서 처음 커밋하기 전에 스타일을 분석하고 물어본다" 를 요구한다.
+매번 손으로 하지 않도록 스크립트로 뽑는다.
+
+```sh
+shared/scripts/repo-profile.sh <repo>          # 표만 보기
+shared/scripts/repo-profile.sh <repo> --save   # 승인 후 .claude/repo-profile.md 에 기록
+```
+
+내는 것: 언어, 접두사 체계(conventional / 스코프형 / 없음), 다중 스코프 형태, 제목 길이 중앙값·p90,
+본문 비율, Signed-off-by, 머지 커밋 유무, 티켓번호, 코드 인덴트, 행 길이, 주석 언어.
+
+Revert/Merge 는 자동 생성 제목이라 통계에서 뺀다. 내 커밋이 20개 이상이면 내 것만 보고,
+적으면 repo 전체를 보면서 그렇다고 밝힌다. 코드 표본은 **그 사람이 최근에 만진 파일**에서 고른다.
+
+`.claude/repo-profile.md` 가 있으면 다시 묻지 않는다.
+
 ## 커밋 훅
 
 ```sh
@@ -50,13 +68,23 @@ hooks/install-hooks.sh <repo>            # gh 로 공개 여부를 보고 프로
 hooks/install-hooks.sh <repo> private    # 명시 지정
 ```
 
-| 프로필 | 차단 대상 |
-|--------|-----------|
-| `public` | 비밀번호·토큰·개인키 + 내부 조직명 + 사설/공인 IP + em dash |
-| `private` | 비밀번호·토큰·개인키만 |
+`pre-commit` 과 `commit-msg` 둘 다 설치된다.
+
+| 훅 | 검사 | 프로필 |
+|----|------|--------|
+| `pre-commit` | 비밀번호·토큰·개인키 | 항상 |
+| `pre-commit` | 내부 조직명, 사설/공인 IP | `public` 만 |
+| `pre-commit` | em dash | 항상 |
+| `pre-commit` | `.claude/verify-targets.md` 등 접속 대상 파일 | 항상 |
+| `commit-msg` | Co-Authored-By, AI 생성 문구, em dash, 제목 뒤 `-` 부연, 본문 앞 빈 줄 | 항상 |
 
 사내 repo 에서는 내부 조직명과 사설 IP 가 정상 내용이므로 `private` 이 기본이다.
-기존 훅이 있으면 `pre-commit.orig` 로 옮겨 체인하므로 husky 같은 것이 안 깨진다.
+**em dash 와 커밋 메시지 규칙은 시크릿이 아니라 표기 규칙이므로 프로필을 안 가린다.**
+
+본문 자체는 막지 않는다. 부연이 필요하면 제목 다음 빈 줄 뒤에 쓴다.
+`Revert "..."` / `Merge ...` / `fixup!` 제목은 남의 커밋 제목을 인용하는 것이라 제목 규칙에서 뺀다.
+
+기존 훅이 있으면 `<훅이름>.orig` 로 옮겨 체인하므로 husky 같은 것이 안 깨진다.
 프로필은 `.git/hooks/.profile` 에 적히고 훅은 그 값을 읽는다.
 
 ## 새 머신에 설치
