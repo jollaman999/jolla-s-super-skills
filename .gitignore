@@ -1,5 +1,6 @@
 # 실제 접속 대상 - 호스트/계정이 들어가므로 커밋하지 않는다
 .claude/verify-targets.md
+.claude/verify-progress.md
 **/verify-targets.local.md
 
 # 시크릿
