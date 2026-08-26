@@ -55,6 +55,20 @@ check "AWS 액세스 키" \
   'AKIA[0-9A-Z]{16}' \
   "즉시 키를 폐기하세요"
 
+# npm/yarn 레지스트리 자격증명. .npmrc 에 실제 토큰이 커밋된 사례가 있었다.
+check "npm 레지스트리 토큰" \
+  '_(authToken|auth|password)[[:space:]]*=[[:space:]]*[^[:space:]$#{]{8,}' \
+  "값을 지우고 \${NPM_TOKEN} 같은 env 참조로 바꾸세요"
+
+check "GitLab 토큰" \
+  '(glpat-|glptt-|gldt-)[A-Za-z0-9_-]{15,}' \
+  "즉시 해당 토큰을 폐기하세요"
+
+# URL 에 박힌 자격증명. git remote, pip index-url, DB DSN 에서 흔하다.
+check "URL 에 박힌 자격증명" \
+  '://[A-Za-z0-9._%+-]+:[^[:space:]@/\"'"'"']{4,}@' \
+  "자격증명을 URL 에서 빼고 env 나 인증 파일로 옮기세요"
+
 check "개인키" \
   'BEGIN [A-Z ]*PRIVATE KEY' \
   "키 파일은 커밋하지 않습니다"
