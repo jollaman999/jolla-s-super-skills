@@ -10,7 +10,9 @@ set -uo pipefail
 CMD="${1:?take|drift|clean}"; shift
 
 hashes() { # <dir> - 추적 대상 파일의 해시 목록
-  git -C "$1" ls-files -z 2>/dev/null | xargs -0 -r md5sum 2>/dev/null | sort -k2
+  # md5sum 은 호출자의 cwd 에서 돈다. git -C 로 목록만 받으면 경로가 안 맞아
+  # 거의 모든 파일이 조용히 빠진다. 반드시 그 디렉터리 안에서 실행한다.
+  ( cd "$1" 2>/dev/null && git ls-files -z 2>/dev/null | xargs -0 -r md5sum 2>/dev/null ) | sort -k2
 }
 
 case "$CMD" in
