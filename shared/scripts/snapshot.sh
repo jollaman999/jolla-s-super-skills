@@ -45,8 +45,12 @@ drift)
   ;;
 clean)
   SNAP="${1:?snap_dir}"
-  case "$SNAP" in */snap-*) rm -rf "$SNAP"; echo "제거: $SNAP" ;;
-                        *) echo "스냅샷 경로가 아님, 거부: $SNAP" >&2; exit 2 ;; esac
+  # 경로 이름만으로 판단하지 않는다. /tmp/snap-private-tmp 같은 남의 디렉터리가
+  # */snap-* 에 걸린다. 내가 만든 스냅샷에만 있는 표식 파일로 확인한다.
+  if [ ! -f "$SNAP/.snap-base.md5" ]; then
+    echo "내가 만든 스냅샷이 아님, 거부: $SNAP" >&2; exit 2
+  fi
+  rm -rf "$SNAP"; echo "제거: $SNAP"
   ;;
 *) echo "usage: snapshot.sh take|drift|clean" >&2; exit 2 ;;
 esac
