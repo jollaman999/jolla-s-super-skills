@@ -4,13 +4,13 @@
 호스트: <목록>
 방법 범례: `ssh`=원격실행 · `log`=로그·상태 · `db`=DB조회 · `deploy`=배포대조 · `front`=프론트 · `static`=코드대조
 
-| id | 대상 | 방법 | 절차 | 판정기준 | 민감도 |
-|----|------|------|------|----------|--------|
-| VF-01 | 수집 에이전트 기동 (agent.go:88) | ssh | `docker inspect app-svc --format '{{.State.Health.Status}}'` | pass: `healthy` | 안전 |
-| VF-02 | 메트릭 실제 적재 (writer.go:120) | db | `docker exec influxdb influx query '…range(start:-5m)…limit(n:5)'` | pass: 5분 내 포인트 존재 | 안전 |
-| VF-03 | 최신 빌드 반영 여부 | deploy | 로컬 md5 vs 원격 md5 | pass: 일치 | 안전 |
-| VF-04 | 설정 변경 반영 (config.go:44) | ssh | 설정 수정 → **재기동** → 값 재조회 | pass: 새 값 반영 | **위험** |
-| VF-05 | 프론트 로그인 → 목록 표시 | front | 로그인 후 /vms 진입 | pass: 목록 렌더 + 401 없음 | 주의 |
+| id | 대상 | 방법 | 절차 | 판정기준 | 기준출처 | 민감도 |
+|----|------|------|------|----------|----------|--------|
+| VF-01 | 수집 에이전트 기동 (agent.go:88) | ssh | `docker inspect app-svc --format '{{.State.Health.Status}}'` | pass: `healthy` | **코드** | 안전 |
+| VF-02 | 메트릭 실제 적재 (writer.go:120) | db | `docker exec influxdb influx query '…range(start:-5m)…limit(n:5)'` | pass: 5분 내 포인트 존재 | 사용자 | 안전 |
+| VF-03 | 최신 빌드 반영 여부 | deploy | 로컬 md5 vs 원격 md5 | pass: 일치 | 코드 | 안전 |
+| VF-04 | 설정 변경 반영 (config.go:44) | ssh | 설정 수정 → **재기동** → 값 재조회 | pass: 새 값 반영 | 사용자 | **위험** |
+| VF-05 | 프론트 로그인 → 목록 표시 | front | 로그인 후 /vms 진입 | pass: 목록 렌더 + 401 없음 | **코드** | 주의 |
 
 ## 신경 쓰셔야 할 항목 (민감도 위험/주의)
 
@@ -22,8 +22,18 @@
 **[주의] VF-05** - 프론트 로그인 세션 생성
 - 되돌리기: 로그아웃
 
+## 제가 코드를 읽고 기준을 정한 항목 (확인 필요)
+
+아무도 말해준 적 없어서 제가 정한 기준입니다. **"정상" 을 잘못 잡았을 수 있습니다.**
+
+**VF-01  수집 에이전트 기동**
+- 정상으로 봄: `docker inspect` 결과가 `healthy`
+- 출처: 코드 (compose 의 healthcheck 정의)
+- → 이 기준이 맞습니까?
+
 ## 확인 요청
 1. 빠진 항목 / 뺄 항목이 있나요?
 2. 판정기준이 실제 요구사항과 다른 항목이 있나요?
 3. 위 위험 항목을 진행해도 되나요?
 4. 검증 후 정리(cleanup)까지 할까요?
+5. 위 "코드를 읽고 정한 기준" 이 맞습니까?
