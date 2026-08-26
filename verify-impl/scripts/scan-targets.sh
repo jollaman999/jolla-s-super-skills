@@ -31,9 +31,21 @@ grep -rInE '^\s*-?\s*"?[0-9]{2,5}:[0-9]{2,5}"?|ports?:|EXPOSE |listen\s*[:=]|POR
   --include='*.env*' --include='*.toml' . 2>/dev/null | head -30
 
 echo
-echo "=== 3. 인증 관련 env 변수명 (값 아님) ==="
-grep -rhoIE '\b[A-Z][A-Z0-9_]{2,}(TOKEN|SECRET|KEY|PASSWORD|PASSWD|AUTH|CRED|APIKEY|API_KEY)[A-Z0-9_]*\b' $EX . 2>/dev/null \
-  | sort -u | head -40
+echo "=== 3. env 변수명 (값 아님) ==="
+# 대문자 식별자를 통째로 긁으면 TS/JS 프로젝트에서 ALARM_TAB_KEY_MAP 같은 상수가 쏟아진다.
+# env 파일의 좌변과 실제 env 접근 패턴만 본다.
+{
+  # (a) .env 계열 파일의 변수명 (= 좌변만)
+  for f in $(find . -maxdepth 3 -name '.env' -o -maxdepth 3 -name '.env.*' -o -maxdepth 3 -name '*.env' 2>/dev/null | grep -vE 'node_modules|/\.git/' | head -20); do
+    grep -hoE '^[[:space:]]*(export[[:space:]]+)?[A-Z][A-Z0-9_]*(?==)' "$f" 2>/dev/null \
+      || grep -hoE '^[[:space:]]*(export[[:space:]]+)?[A-Z][A-Z0-9_]*=' "$f" 2>/dev/null | tr -d '= '
+  done
+  # (b) 코드에서의 env 접근
+  grep -rhoIE 'process\.env\.[A-Z][A-Z0-9_]*' $EX . 2>/dev/null | sed 's/.*\.//'
+  grep -rhoIE 'import\.meta\.env\.[A-Z][A-Z0-9_]*' $EX . 2>/dev/null | sed 's/.*\.//'
+  grep -rhoIE '(os\.Getenv|System\.getenv|getenv)\(["'"'"']([A-Z][A-Z0-9_]*)' $EX . 2>/dev/null | sed -E 's/.*["'"'"']//'
+  grep -rhoIE '\$\{?[A-Z][A-Z0-9_]{3,}\}?' $EX --include='docker-compose*' --include='*.yml' --include='*.yaml' --include='Dockerfile*' . 2>/dev/null | tr -d '${}'
+} 2>/dev/null | grep -vE '^(PATH|HOME|USER|SHELL|PWD|LANG|TERM|NODE_ENV|CI)$' | sort -u | head -40
 
 echo
 echo "=== 4. API 스펙 ==="
