@@ -7,7 +7,13 @@
 #   n      : 분석할 커밋 수 (기본 200)
 #   --save : 결과를 <repo>/.claude/repo-profile.md 에 쓴다
 #
+# env: PROFILE_ME  내 이름/메일을 콤마로 추가 지정. git config 와 다른 계정으로 커밋한 repo 용
+#      예: PROFILE_ME="jollaman999,admin@example.com"
+#
 # exit: 0=정상  2=repo 아님/커밋 없음
+#
+# 남의 repo(클론해 둔 남의 프로젝트)에서 돌리면 그 repo 의 관례가 나온다.
+# 그것을 내 스타일로 착각하지 않도록 소유 판정을 먼저 하고 결과에 표시한다.
 set -uo pipefail
 
 DIR="$PWD"; N=200; SAVE=0
@@ -24,17 +30,46 @@ git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1 || { echo "git repo 아님: $D
 g(){ git -C "$DIR" "$@"; }
 pct(){ [ "${2:-0}" -eq 0 ] && { echo 0; return; }; echo $(( $1 * 100 / $2 )); }
 
-# --- 분석 대상 커밋 고르기 ---
-# 내 커밋이 충분히 있으면 내 것만 본다. 적으면 repo 전체를 보고 그렇다고 밝힌다.
-ME=$(g config user.name 2>/dev/null || echo "")
+# --- 이 repo 가 내 것인가 ---
+# shortlog 는 전체 이력을 한 번에 집계한다. 저자별로 git log 를 돌리면 매칭 안 되는
+# 이름마다 전체를 훑어서 커널 규모 repo 에서 몇 초씩 더 든다.
+IDS=()
+for v in "$(g config user.name 2>/dev/null)" "$(g config user.email 2>/dev/null)"; do
+  [ -n "$v" ] && IDS+=("$v")
+done
+if [ -n "${PROFILE_ME:-}" ]; then
+  IFS=',' read -ra _extra <<< "$PROFILE_ME"
+  for v in "${_extra[@]}"; do v="${v#"${v%%[![:space:]]*}"}"; v="${v%"${v##*[![:space:]]}"}"
+    [ -n "$v" ] && IDS+=("$v"); done
+fi
+
+AUTHORS=$(g shortlog -sne HEAD 2>/dev/null)
+count_for(){ # <이름 또는 메일> - 그 사람 이름/메일과 정확히 일치하는 저자의 커밋 수
+  printf '%s\n' "$AUTHORS" | awk -v id="$1" -F'\t' '
+    NF>1 { n=$2; sub(/ <.*/,"",n); e=$2; sub(/.*</,"",e); sub(/>$/,"",e)
+           c=$1; gsub(/[^0-9]/,"",c)
+           if (n==id || e==id) s+=c } END{ print s+0 }'
+}
+
+ME=""; MINE=0
+for id in "${IDS[@]:-}"; do
+  [ -n "$id" ] || continue
+  c=$(count_for "$id")
+  [ "$c" -gt "$MINE" ] && { MINE=$c; ME="$id"; }
+done
+
+TOPAUTHOR=$(printf '%s\n' "$AUTHORS" | head -1 | sed -E 's/^[[:space:]]*[0-9]+[[:space:]]*//')
+RURL=$(g remote get-url origin 2>/dev/null || echo "")
+ROWNER=$(printf '%s' "$RURL" | sed -E 's#\.git$##; s#^.*[:/]([^/:]+)/[^/]+$#\1#')
+
 SCOPE_NOTE="repo 전체"
 AUTHOPT=()
-if [ -n "$ME" ]; then
-  MINE=$(g log --author="$ME" --oneline -n 60 2>/dev/null | wc -l)
-  if [ "$MINE" -ge 20 ]; then
-    AUTHOPT=(--author="$ME")
-    SCOPE_NOTE="$ME 의 커밋"
-  fi
+if [ "$MINE" -ge 20 ]; then
+  OWNER=mine; AUTHOPT=(--author="$ME"); SCOPE_NOTE="$ME 의 커밋"
+elif [ "$MINE" -gt 0 ]; then
+  OWNER=mine; SCOPE_NOTE="repo 전체 (내 커밋은 $MINE 개뿐이라 전체를 본다)"
+else
+  OWNER=unknown
 fi
 
 # Revert/Merge 는 자동 생성 제목이라 본인 스타일이 아니다. 제외하고 센다.
@@ -152,11 +187,33 @@ EOF
 )
 fi
 
+# --- 소유 판정에 따른 문구 ---
+if [ "$OWNER" = mine ]; then
+  OWNER_BLOCK="- 소유: **내 repo** (내 커밋 $MINE 개, \`$ME\`)"
+  CLOSING="## 확인받을 것
+
+> 이 repo 는 $LANG_VERDICT + $PREFIX_VERDICT 이고 제목 중앙값이 ${MED}자입니다.
+> 주석은 ${CLANG:-미확인}, 인덴트는 ${INDENT:-미확인} 입니다. 이대로 갈까요?"
+else
+  OWNER_BLOCK="- 소유: **내 커밋 없음**  (remote 소유자: \`${ROWNER:-없음}\` · 최다 저자: \`${TOPAUTHOR:-미상}\`)"
+  CLOSING="## 주의 - 내 커밋이 없는 repo 입니다
+
+위 통계는 **이 repo 의 관례**이지 내 스타일이 아닙니다. 둘을 섞지 마세요.
+
+| 경우 | 할 것 |
+|------|-------|
+| 클론해 둔 남의 프로젝트 | 기여한다면 **위 관례를 그대로** 따른다. 내 커밋 규칙을 적용하지 않는다 |
+| 내 repo 인데 다른 계정으로 커밋함 | \`PROFILE_ME=\"이름,메일\"\` 을 주고 다시 돌린다 |
+
+remote 소유자와 최다 저자가 같은 사람이면 그 사람의 repo 입니다. 판단은 사람이 합니다."
+fi
+
 # --- 출력 ---
 OUT=$(cat <<EOF
 # repo 프로필
 
 - 대상: \`$DIR\`
+$OWNER_BLOCK
 - 분석 범위: $SCOPE_NOTE 중 최근 $TOTAL 개 (Revert/Merge 제외)
 - 뽑은 날: $(date +%F)
 
@@ -192,10 +249,7 @@ $(printf '%s\n' "$SUBJ" | head -10)
 
 $CODE_BLOCK
 
-## 확인받을 것
-
-> 이 repo 는 $LANG_VERDICT + $PREFIX_VERDICT 이고 제목 중앙값이 ${MED}자입니다.
-> 주석은 ${CLANG:-미확인}, 인덴트는 ${INDENT:-미확인} 입니다. 이대로 갈까요?
+$CLOSING
 EOF
 )
 
