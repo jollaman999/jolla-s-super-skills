@@ -53,7 +53,7 @@ timeout 30 ssh -n root@"$H" "pgrep -af '<서비스명>|ansible|docker (build|loa
 | 다른 세션이 같은 repo 에 있음 | 커밋 단계에서 `git add -A` 금지. 경로를 명시해 add |
 | 원격에서 다른 작업이 돎 | **재기동하지 않는다.** 사용자에게 알리고 기다릴지 묻는다 |
 
-절차 → `~/.claude/skills/shared/references/concurrent-sessions.md`
+절차 → `../shared/references/concurrent-sessions.md`
 
 ## 1. 대상·범위 확인
 

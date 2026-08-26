@@ -120,7 +120,7 @@ flowchart TD
 - 다른 세션이 편집 중인 파일 수정
 - 그 세션이 쓰는 호스트의 서비스 재기동
 
-절차와 판단 기준 → `~/.claude/skills/shared/references/concurrent-sessions.md`
+절차와 판단 기준 → `../shared/references/concurrent-sessions.md`
 
 ## N. 이전 진행 확인 · 재개
 

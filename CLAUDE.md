@@ -76,7 +76,7 @@ zsh 는 따옴표 없는 변수를 단어 분할하지 않는다. `git checkout 
 ## 커밋 훅
 프로젝트에서 **처음 커밋하기 전에** `.git/hooks/` 에 `pre-commit` 과 `commit-msg` 가 있는지 확인한다.
 없으면 설치할지 **물어본다** (자동으로 깔지 않는다). 승인하면:
-`~/ai/skills/hooks/install-hooks.sh <repo>` - 기존 훅이 있으면 체인해서 보존한다.
+`~/.claude/skills/hooks/install-hooks.sh <repo>` - 기존 훅이 있으면 체인해서 보존한다.
 
 | 훅 | 검사 | 프로필 영향 |
 |----|------|-------------|
