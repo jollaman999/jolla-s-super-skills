@@ -88,6 +88,52 @@ timeout 240 sshpass -p "$PW" ssh -o StrictHostKeyChecking=no root@"$HOST" 'sh /t
 ```
 따옴표 중첩이 3단 이상 되면 무조건 이 방식으로 간다.
 
+## pgrep 자기 매칭 함정
+
+원격에서 "그 작업이 끝났나" 를 `pgrep` 으로 볼 때 **자기 자신을 매칭해 루프가 영원히 안 끝난다.**
+
+```sh
+# 틀림 - ssh 가 실행하는 명령줄에 "mcc infra run" 이 들어 있어 pgrep 이 자기를 찾는다
+until timeout 30 ssh -n root@"$H" '! pgrep -f "mcc infra run"'; do sleep 15; done
+```
+
+실제로 이 패턴으로 25시간 동안 15초마다 SSH 를 여는 루프가 3개 돌고 있었다. 기다리던 작업은 이틀 전에 끝나 있었다.
+
+확인:
+```sh
+$ pgrep -af "mcc infra"
+3302987 bash -c ... pgrep -af "mcc infra" ...     # 자기 자신
+```
+
+### 고치는 법
+
+```sh
+# 1) 대괄호로 자기 매칭을 깬다 (가장 간단)
+ssh -n root@"$H" '! pgrep -f "[m]cc infra run"'
+
+# 2) pgrep 대신 종료 표식을 본다 - 더 확실하다
+ssh -n root@"$H" 'test -f /tmp/mcc.done'
+# 작업 쪽: mcc infra run …; echo $? > /tmp/mcc.done
+
+# 3) pid 를 직접 붙잡는다
+PID=$(ssh -n root@"$H" 'pgrep -o -f "[m]cc infra run"')
+ssh -n root@"$H" "while kill -0 $PID 2>/dev/null; do sleep 15; done"
+```
+
+### 무한 루프 자체를 막는다
+
+**`until` 에는 반드시 횟수 상한을 건다.** 조건이 틀리면 영원히 돈다.
+
+```sh
+for i in $(seq 1 40); do            # 40 × 15s = 10분 상한
+  ssh -n root@"$H" 'test -f /tmp/mcc.done' && break
+  [ "$i" = 40 ] && { echo "TIMEOUT - 상태를 직접 확인할 것"; break; }
+  sleep 15
+done
+```
+
+폴링을 시작하기 전에 **기다리는 대상이 실제로 돌고 있는지 먼저 확인한다.** 이미 끝났으면 폴링할 이유가 없다.
+
 ## 금지
 
 - `timeout` 없는 원격 명령
@@ -95,3 +141,5 @@ timeout 240 sshpass -p "$PW" ssh -o StrictHostKeyChecking=no root@"$HOST" 'sh /t
 - 승인 안 된 재기동·쓰기·삭제
 - 비밀번호를 evidence/보고서에 평문으로
 - `--since`/`tail` 없는 전체 로그 수집
+- 상한 없는 `until` 폴링 (조건이 틀리면 영원히 돈다)
+- `pgrep -f "<문자열>"` 을 그 문자열이 든 명령 안에서 쓰기 (자기 매칭)

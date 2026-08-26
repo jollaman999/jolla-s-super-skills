@@ -11,7 +11,7 @@ Claude Code 개인 skill 과 전역 작업 규칙.
 | `agents/` | `~/.claude/agents/` (파일별 심볼릭 링크) | verify-impl 이 부리는 전문 서브에이전트 8종 |
 | `deploy-verify/` | `~/.claude/skills/deploy-verify` | 빌드 → 커밋 → 전송 → 재기동 → 반영 확인 → 실증 |
 | `shared/` | `~/.claude/skills/shared` | 동시 세션 감지와 스냅샷. 두 skill 이 같이 쓴다 |
-| `hooks/pre-commit` | `.git/hooks/pre-commit` | 시크릿·사설IP·내부명·em dash 커밋 차단 |
+| `hooks/` | 각 repo `.git/hooks/` | 시크릿 커밋 차단. 프로필 2종, 기존 훅 체인 보존 |
 
 ## verify-impl 팀 구성
 
@@ -42,6 +42,22 @@ Claude Code 개인 skill 과 전역 작업 규칙.
 
 fail 은 보고로 끝나지 않고 H 에서 원인까지 추적한다. **진단만 하고 고치지는 않는다.**
 사용자가 수정한 뒤에는 R 이 실패 항목만 재검증한다 (배포 반영 확인 후, 상한 3회).
+
+## 커밋 훅
+
+```sh
+hooks/install-hooks.sh <repo>            # gh 로 공개 여부를 보고 프로필 자동 결정
+hooks/install-hooks.sh <repo> private    # 명시 지정
+```
+
+| 프로필 | 차단 대상 |
+|--------|-----------|
+| `public` | 비밀번호·토큰·개인키 + 내부 조직명 + 사설/공인 IP + em dash |
+| `private` | 비밀번호·토큰·개인키만 |
+
+사내 repo 에서는 내부 조직명과 사설 IP 가 정상 내용이므로 `private` 이 기본이다.
+기존 훅이 있으면 `pre-commit.orig` 로 옮겨 체인하므로 husky 같은 것이 안 깨진다.
+프로필은 `.git/hooks/.profile` 에 적히고 훅은 그 값을 읽는다.
 
 ## 새 머신에 설치
 

@@ -80,6 +80,16 @@ timeout 400 ssh -n root@"$H" "cp /app-config/application.yaml.bak.<ts> /app-conf
 
 배포 전에 **이 명령을 미리 준비**해 둔다. 문제가 생긴 뒤에 찾으면 늦다.
 
+## 폴링 함정
+
+원격 작업 종료를 기다릴 때 두 가지를 지킨다.
+
+1. **`pgrep -f "X"` 를 X 가 든 명령 안에서 쓰지 않는다.** 자기 자신을 매칭해 영원히 안 끝난다.
+   `[m]cc` 처럼 대괄호로 깨거나, 종료 표식 파일(`test -f /tmp/x.done`)을 쓴다.
+2. **`until` 에 횟수 상한을 건다.** `scripts/deploy-wait.sh` 는 이미 상한이 들어 있다.
+
+폴링 전에 **기다릴 대상이 실제로 돌고 있는지** 먼저 본다. 이미 끝났으면 폴링할 이유가 없다.
+
 ## 금지
 
 - 전송 무결성 확인 없이 로드
@@ -87,3 +97,5 @@ timeout 400 ssh -n root@"$H" "cp /app-config/application.yaml.bak.<ts> /app-conf
 - 운영 전체 동시 재기동 (묻고 한다)
 - 실패한 호스트를 남기고 다음으로 진행
 - `timeout` / `ssh -n` 없는 원격 명령
+- 상한 없는 `until` 폴링
+- `pgrep -f` 자기 매칭

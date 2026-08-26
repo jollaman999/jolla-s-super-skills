@@ -1,9 +1,24 @@
 #!/usr/bin/env bash
-# 공개 repo 유출 차단. 스테이지된 내용만 검사한다.
-# 설치: ln -sf ../../hooks/pre-commit .git/hooks/pre-commit
+# 커밋 유출 차단. 스테이지된 내용만 검사한다.
+# 설치: hooks/install-hooks.sh <repo>
 # 우회: git commit --no-verify  (정말 필요할 때만)
+#
+# 프로필 - repo 의 .git/hooks/.profile 파일 또는 HOOK_PROFILE 로 지정
+#   public  : 시크릿 + 내부 조직명 + 사설/공인 IP 전부 차단 (공개 repo)
+#   private : 시크릿(비밀번호·토큰·키)만 차단 (사내/비공개 repo)
+# 미지정이면 remote 주소로 자동 판별하고, 애매하면 private 로 간다 (오탐 최소화).
 set -uo pipefail
 FAIL=0
+
+GITDIR=$(git rev-parse --git-dir 2>/dev/null || echo .git)
+PROFILE="${HOOK_PROFILE:-}"
+if [ -z "$PROFILE" ] && [ -f "$GITDIR/hooks/.profile" ]; then
+  PROFILE=$(tr -d '[:space:]' < "$GITDIR/hooks/.profile")
+fi
+# 프로필이 안 적혀 있으면 private 로 간다.
+# 공개 여부 판별은 설치 시점(install-hooks.sh)에 gh 로 정확히 하고 .profile 에 적는다.
+# 훅에서 매번 판별하면 느리고, GitHub 비공개 repo 를 public 으로 오판해 정상 커밋을 막는다.
+[ -z "$PROFILE" ] && PROFILE=private
 red(){ printf '\033[31m%s\033[0m\n' "$*"; }
 
 # 훅 자신은 검사 대상에서 뺀다 - 탐지 패턴이 곧 금지 문자열이라 자기를 차단한다.
@@ -43,11 +58,14 @@ check "개인키" \
   'BEGIN [A-Z ]*PRIVATE KEY' \
   "키 파일은 커밋하지 않습니다"
 
+if [ "$PROFILE" = public ]; then
 check "사내 도메인/조직명" \
   '(innogrid|tabcloudit|o11y-manager|o11y-infra|jollaman999@|ish@)' \
   "일반 예시 이름으로 바꾸세요"
+fi
 
-# 사설/공인 IP - 문서용 대역은 허용
+# 사설/공인 IP - 문서용 대역은 허용. public 프로필만.
+if [ "$PROFILE" = public ]; then
 ips=$(git diff --cached --unified=0 -- $staged 2>/dev/null \
       | grep -E '^\+' | grep -vE '^\+\+\+' \
       | grep -hoE '([0-9]{1,3}\.){3}[0-9]{1,3}' | sort -u \
@@ -58,9 +76,10 @@ if [ -n "$ips" ]; then
   echo "    -> RFC1918(10.0.x.x) 또는 TEST-NET(192.0.2.x / 198.51.100.x / 203.0.113.x) 으로 바꾸세요"
   FAIL=1
 fi
+fi
 
-# em dash
-if git diff --cached --unified=0 -- $staged 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+' | grep -q '—'; then
+# em dash - public 프로필만 (문서 repo 대상)
+if [ "$PROFILE" = public ] && git diff --cached --unified=0 -- $staged 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+' | grep -q '—'; then
   red "차단: em dash(—) 사용"
   echo "    -> 하이픈(-)으로 바꾸세요"
   FAIL=1
@@ -74,6 +93,7 @@ fi
 
 if [ $FAIL -ne 0 ]; then
   echo
+  echo "  (프로필: $PROFILE)"
   red "커밋을 중단했습니다. 위 항목을 고친 뒤 다시 커밋하세요."
   echo "정말 의도한 것이면: git commit --no-verify"
   exit 1
