@@ -67,6 +67,11 @@ PROFILE_ME="jollaman999,admin@example.com" repo-profile.sh <repo>
 
 정보만 모으고 판단은 호출한 쪽이 합니다. 다른 세션이 있으면 exit 1 입니다.
 
+세션 기록을 못 찾으면 **exit 2(확인 불가)** 입니다. 이걸 0 으로 뭉개지 않습니다.
+기록이 없는 것과 세션이 없는 것은 다릅니다. Windows 에서는 Claude Code 가
+Windows 경로로 기록 디렉터리 이름을 만들기 때문에 POSIX 경로 변환만으로는 어긋납니다.
+그래서 `cygpath` 형태와 경로 꼬리까지 같이 찾아보고, 그래도 못 찾으면 2 로 끝냅니다.
+
 ## snapshot.sh
 
 **원본을 오래 붙잡지 않고, 스냅샷을 떠서 그 위에서 분석합니다.**

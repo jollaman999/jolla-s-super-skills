@@ -50,6 +50,7 @@ timeout 30 ssh -n root@"$H" "pgrep -af '<서비스명>|ansible|docker (build|loa
 | 상황 | 행동 |
 |------|------|
 | 둘 다 없음 | 진행 |
+| session-guard 가 **확인 불가(exit 2)** | 없다고 단정하지 않는다. `git add -A` 금지를 그대로 적용한다 |
 | 다른 세션이 같은 repo 에 있음 | 커밋 단계에서 `git add -A` 금지. 경로를 명시해 add |
 | 원격에서 다른 작업이 돎 | **재기동하지 않는다.** 사용자에게 알리고 기다릴지 묻는다 |
 
