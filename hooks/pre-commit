@@ -84,8 +84,14 @@ check "개인키" \
 
 if [ "$PROFILE" = public ]; then
 check "사내 도메인/조직명" \
-  '(innogrid|tabcloudit|o11y-manager|o11y-infra|jollaman999@|ish@)' \
+  '(innogrid|tabcloudit|jollaman999@|ish@)' \
   "일반 예시 이름으로 바꾸세요"
+
+# 제품명은 부분 문자열 오탐이 난다. mc-o11y-manager 는 공개 모듈 이름이지 사내 제품이 아니다.
+# 앞에 하이픈이 붙으면 다른 이름으로 보고 넘긴다.
+check "사내 제품명" \
+  '(^|[^-])(o11y-manager|o11y-infra)' \
+  "mc- 가 붙은 공개 모듈명이면 그대로 두고, 사내 제품을 가리키면 일반 이름으로 바꾸세요"
 fi
 
 # 사설/공인 IP - 문서용 대역은 허용. public 프로필만.
