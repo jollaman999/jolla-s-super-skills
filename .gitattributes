@@ -1,0 +1,8 @@
+# Windows 에서 core.autocrlf=true 로 클론하면 셔뱅 뒤에 \r 이 붙어
+# "bad interpreter: /usr/bin/env bash^M" 로 실행 자체가 안 된다.
+# 이 repo 는 전부 Git Bash 에서 돌아가는 파일이라 LF 로 못 박는다.
+* text=auto eol=lf
+
+# 확장자가 없어 위 규칙만으로는 놓치기 쉬운 것들
+hooks/pre-commit text eol=lf
+hooks/commit-msg text eol=lf
