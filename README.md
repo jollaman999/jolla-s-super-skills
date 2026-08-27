@@ -60,6 +60,31 @@ cd ~/ai/skills
 **프로젝트 설치를 쓰면** 문서에 적힌 `~/.claude/skills/...` 경로를
 `<프로젝트>/.claude/skills/...` 로 바꿔 읽으세요. 배치는 같습니다.
 
+## Windows
+
+네이티브 Windows 에서는 **Git for Windows 가 필요합니다.**
+Claude Code 는 Git for Windows 가 있으면 Bash 도구를 Git Bash 로 돌리고,
+없으면 PowerShell 만 씁니다. 이 repo 는 전부 bash 스크립트라 Git Bash 가 있어야 돕니다.
+
+WSL 을 쓰신다면 리눅스와 같습니다. 아래는 네이티브 Windows 기준입니다.
+
+| 항목 | 필요 | 없으면 |
+|------|------|--------|
+| Git for Windows | 필수 | Bash 도구 자체가 없어 아무것도 안 돕니다 |
+| 심볼릭 링크 | 개발자 모드 또는 관리자 권한 | `install.sh` 가 복사 설치를 제안합니다 |
+| `sshpass` | 비밀번호 SSH 를 쓸 때만 | 해당 항목이 `unknown` 으로 나옵니다. **SSH 키를 쓰세요** |
+| Docker Desktop | 컨테이너 헬스 체크를 쓸 때만 | 그 항목만 건너뜁니다 |
+
+설치 전에 무엇이 없는지 먼저 봅니다. 아무것도 바꾸지 않습니다.
+
+```sh
+./doctor.sh
+```
+
+`ln -s` 는 개발자 모드가 꺼져 있으면 **링크 대신 조용히 복사**를 합니다.
+그러면 `git pull` 해도 반영이 안 되는데 링크인 줄 알게 됩니다.
+`install.sh` 는 링크를 건 뒤 정말 링크인지 확인하고, 아니면 멈춥니다.
+
 ## 무엇이 들어 있나
 
 | 구성 | 하는 일 |
@@ -70,6 +95,7 @@ cd ~/ai/skills
 | [`agents/`](agents/) | verify-impl 이 부리는 전문 서브에이전트 |
 | [`shared/`](shared/) | 동시 세션 감지, 스냅샷, repo 스타일 프로파일러 |
 | [`hooks/`](hooks/) | 시크릿 유출과 잘못된 커밋 메시지를 커밋 시점에 차단합니다 |
+| [`doctor.sh`](doctor.sh) | 이 환경에서 돌 수 있는지 먼저 봅니다. 아무것도 바꾸지 않습니다 |
 
 각 폴더의 README 에 자세한 내용이 있습니다.
 
