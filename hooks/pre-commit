@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # 커밋 유출 차단. 스테이지된 내용만 검사한다.
+# jolla-skills-hook  (install-hooks.sh 가 이 표식으로 자기 것을 알아본다. 지우지 말 것)
 # 설치: hooks/install-hooks.sh <repo>
 # 우회: git commit --no-verify  (정말 필요할 때만)
 #
