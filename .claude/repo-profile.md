@@ -1,6 +1,6 @@
 # repo 프로필
 
-- 대상: `/home/ish/ai/skills`
+- 대상: `skills`
 - 소유: **내 repo** (내 커밋 34 개, `jollaman999`)
 - 분석 범위: jollaman999 의 커밋 중 최근 34 개 (Revert/Merge 제외)
 - 뽑은 날: 2026-08-28

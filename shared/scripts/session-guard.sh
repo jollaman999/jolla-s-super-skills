@@ -32,8 +32,8 @@ ROOT="$CFG/projects"
 }
 
 # 슬러그 후보. Claude Code 는 작업 디렉터리 경로의 구분자를 '-' 로 바꿔 이름을 만든다.
-#   Linux/WSL : /home/ish/ai/skills      -> -home-ish-ai-skills
-#   Windows    : C:\Users\ish\ai\skills  -> Claude Code 가 보는 것은 Windows 경로다
+#   Linux/WSL : /home/me/proj/app      -> -home-me-proj-app
+#   Windows    : C:\Users\me\proj\app  -> Claude Code 가 보는 것은 Windows 경로다
 CANDS=()
 CANDS+=("$(printf '%s' "$DIR" | sed 's#/#-#g')")
 if have cygpath; then

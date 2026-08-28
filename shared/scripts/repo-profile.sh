@@ -212,7 +212,7 @@ fi
 OUT=$(cat <<EOF
 # repo 프로필
 
-- 대상: \`$DIR\`
+- 대상: \`$(basename "$DIR")\`
 $OWNER_BLOCK
 - 분석 범위: $SCOPE_NOTE 중 최근 $TOTAL 개 (Revert/Merge 제외)
 - 뽑은 날: $(date +%F)
