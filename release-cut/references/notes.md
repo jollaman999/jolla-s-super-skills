@@ -7,12 +7,12 @@
 
 ```markdown
 ## Tested With
-* <연동모듈A> [v0.5.5](<그 모듈의 릴리즈 태그 링크>)
-* <연동모듈B> [v0.12.25](...)
-* <연동모듈C> [v0.12.35](...)
+* provisioner [v0.5.5](https://github.com/acme/provisioner/releases/tag/v0.5.5)
+* orchestrator [v0.12.25](...)
+* csp-broker [v0.12.35](...)
 
 ## API docs
-* Swagger UI URL: <swagger.yaml 을 가리키는 URL>
+* Swagger UI URL: https://acme.github.io/api/?url=.../swagger.yaml
 
 ## How to run
 * https://github.com/<owner>/<repo>?tab=readme-ov-file#how-to-run

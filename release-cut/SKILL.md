@@ -40,7 +40,7 @@ description: 태그를 찍고 릴리즈 노트를 쓰고 바이너리를 올린 
 
 여러 repo 를 한 번에 올리는 일이 잦다.
 
-> "<모듈A>, <모듈B>, <모듈C> **모두 v0.6.0 릴리즈** 해줘"
+> "collector, workflow, migrator **모두 v0.6.0 릴리즈** 해줘"
 
 확인할 것:
 - 어느 repo 들, 각각 어느 버전
@@ -62,7 +62,7 @@ git log --oneline -20 --format='%s'        # 커밋 제목 스타일(언어·접
 **직전 릴리즈를 정본으로 삼는다.**
 
 > "`Integrated or tested with` 이거는 `Tested With` 이라고 쓰고"
-> "`<연동모듈D>` 는 이제 없어"
+> "`commonmodel` 은 이제 없어"
 
 ## 3. 버전 문자열 전수 갱신
 
@@ -76,13 +76,13 @@ grep -rIn "v\?$OLD" --include='*.go' --include='*.yaml' --include='*.yml' \
 | 형태 | 예 |
 |------|-----|
 | 실행 파일 버전 상수 | `agent/cmd/<name>/main.go` 의 버전 변수 |
-| 버전 파일 | `<제품>_version.txt` 같은 빌드 입력 |
+| 버전 파일 | `edge-telegraf_version.txt` 같은 빌드 입력 |
 | compose·차트의 자기 이미지 태그 | `docker-compose.yaml` |
 
 **하위 컴포넌트 버전을 먼저 올린다.** agent 가 있는 repo 는 agent 버전 커밋이 릴리즈보다 앞이다.
 실제 커밋: `agent: Bump the version to v0.6.1`.
 
-> "<모듈A> 같은 경우는 **agent 버전 먼저** v0.6.0 으로 하고 릴리즈하고 바이너리들 업로드"
+> "collector 같은 경우는 **agent 버전 먼저** v0.6.0 으로 하고 릴리즈하고 바이너리들 업로드"
 
 ## 4. 변경 목록 수집
 
@@ -149,7 +149,7 @@ done
 
 **보고하고 승인받아 반영한다.** 절차 → `../shared/references/downstream.md`
 
-> "릴리즈 한거 CD 다 돌아서 Docker Image 완성되면 **<오케스트레이터> 의 docker-compose.yaml 에 v0.5.2 박은 다음에**"
+> "릴리즈 한거 CD 다 돌아서 Docker Image 완성되면 **stackctl 의 docker-compose.yaml 에 v0.5.2 박은 다음에**"
 
 ## 10. 배포
 

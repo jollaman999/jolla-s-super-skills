@@ -14,8 +14,8 @@ repo 두 개, 호스트 세 대, 브랜치 두 개를 오가는 작업이 기본
 ```markdown
 | 대상 | 무엇을 | 결과 |
 |------|--------|------|
-| `<모듈>` master | 캐시 TTL 30초 | `a1b2c3d` 커밋·푸시 |
-| `terraform/<인프라repo>` | asset 경로 갱신 | `e4f5g6h` 커밋, 푸시 안 함 |
+| `app-manager` master | 캐시 TTL 30초 | `a1b2c3d` 커밋·푸시 |
+| `terraform/infra` | asset 경로 갱신 | `e4f5g6h` 커밋, 푸시 안 함 |
 | 10.0.0.11 | 재배포 | 이미지 `v1.9.6`, healthy |
 | 10.0.1.11 | - | **안 했음** (지시 밖) |
 ```

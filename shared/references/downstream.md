@@ -3,9 +3,9 @@
 한 repo 를 고치고 연동 repo 반영을 빠뜨리면, 배포는 성공하고 옛 버전이 돈다.
 그래서 사람이 매번 뒤늦게 짚어 준다. 6주치 세션에서 29번이었다.
 
-> "<배포호스트> 만 바꿀게 아니라 **여기 <모듈B> 랑 <오케스트레이터> 도 반영해야지**"
-> "`~/git/terraform/<인프라repo>` 도 지금 이 구조에 맞게 업데이트 **하라니까**" (같은 지시 3회째)
-> "여기는 이제 고칠 필요 없어 **<상위repo>/<모듈> 에다** 고쳐"
+> "testbed 만 바꿀게 아니라 **여기 workflow 랑 stackctl 도 반영해야지**"
+> "`~/git/terraform/infra` 도 지금 이 구조에 맞게 업데이트 **하라니까**" (같은 지시 3회째)
+> "여기는 이제 고칠 필요 없어 **platform/app-manager 에다** 고쳐"
 
 ## 언제 보나
 
@@ -36,7 +36,7 @@ DOWNSTREAM_ROOTS=~/git/terraform ~/.claude/skills/shared/scripts/downstream-scan
 **보고만 한다.** 연동 repo 는 지시받은 범위 밖이다. 거기서 무엇이 도는지, 지금 고쳐도 되는 시점인지는
 내가 모른다. 먼저 고쳐 놓고 알리는 것과 알리고 지시를 받는 것은 다르다.
 
-예외는 사용자가 그 repo 를 함께 지목했을 때뿐이다 (`"<모듈A> 고치고 <오케스트레이터> 반영해봐"`).
+예외는 사용자가 그 repo 를 함께 지목했을 때뿐이다 (`"collector 고치고 stackctl 반영해봐"`).
 
 ## 기록 형식 - `<repo>/.claude/downstream.md`
 
@@ -45,12 +45,12 @@ DOWNSTREAM_ROOTS=~/git/terraform ~/.claude/skills/shared/scripts/downstream-scan
 
 | 언제 | 대상 | 무엇을 | 반영 확인 |
 |------|------|--------|-----------|
-| 릴리즈 태그를 찍었을 때 | `~/go/src/<워크스페이스>/<오케스트레이터>` | `conf/docker/docker-compose.yaml` 의 이미지 태그 | 배포 호스트에서 스택을 다시 올린 뒤 컨테이너 이미지 확인 |
-| 소스를 고쳤을 때 | `~/git/<상위repo>/<모듈>` | 같은 내용의 사본. **이쪽이 정본이 되는 시점이 있다** | 빌드가 되는지 |
-| 배포 구조가 바뀌었을 때 | `~/git/terraform/<인프라repo>` | asset 구조·이미지 태그 | `terraform plan` |
+| 릴리즈 태그를 찍었을 때 | `~/go/src/myorg/stackctl` | `conf/docker/docker-compose.yaml` 의 이미지 태그 | 배포 호스트에서 스택을 다시 올린 뒤 컨테이너 이미지 확인 |
+| 소스를 고쳤을 때 | `~/git/platform/app-manager` | 같은 내용의 사본. **이쪽이 정본이 되는 시점이 있다** | 빌드가 되는지 |
+| 배포 구조가 바뀌었을 때 | `~/git/terraform/infra` | asset 구조·이미지 태그 | `terraform plan` |
 
 ## 걸리지 않는 것
-- `<모듈D>` - 참조는 있으나 우리가 관리하지 않는다
+- `commonmodel` - 참조는 있으나 우리가 관리하지 않는다
 ```
 
 **"걸리지 않는 것" 을 같이 적는다.** 스캔에 계속 잡히는데 매번 다시 판단하게 되는 걸 막는다.
