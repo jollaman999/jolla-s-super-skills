@@ -109,6 +109,13 @@ VH_HOST=192.0.2.1 VH_TO=6 $S/ssh-run.sh T 'echo x'; [ $? = 2 ]     # 접속불�
 VH_HOST=127.0.0.1 VH_USER=$USER $S/ssh-run.sh T 'exit 3'; [ $? = 1 ]  # 원격 실패 → fail
 VH_HOST=127.0.0.1 VH_USER=$USER $S/ssh-run.sh T 'echo x'; [ $? = 0 ]  # 성공 → pass
 VH_HOST=192.0.2.1 VH_PW='T3st&Pw#1' VH_TO=6 $S/ssh-run.sh T 'mysql -pT3st&Pw#1' | grep -q T3st && echo LEAK
+
+# 접속 실패면 VH_BYPASS 유무와 무관하게 진단이 붙는다 (ip 가 있는 환경)
+VH_HOST=192.0.2.1 VH_TO=6 $S/ssh-run.sh T 'echo x' | grep -q '\[진단\]'
+# refused 는 이미 도달한 것이라 우회 재시도 대상이 아니다 - 진단도 안 붙는다
+VH_HOST=127.0.0.1 VH_PORT=1 VH_TO=6 VH_BYPASS=lo $S/ssh-run.sh T 'echo x' | grep -q '진단' && echo BAD
+# 우회 성공 경로: BindInterface 를 받으면 성공하는 가짜 ssh 를 PATH 앞에 두고
+#   -> verdict=pass, via=bypass:<iface> 가 나와야 한다
 $S/health-wait.sh http://127.0.0.1:59999/ 6 2; [ $? = 1 ]          # 타임아웃 → 1
 $S/scan-targets.sh .; [ $? = 0 ]                                   # 항상 0
 ```

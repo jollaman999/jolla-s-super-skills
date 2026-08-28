@@ -20,6 +20,66 @@ timeout 240 ssh -i /path/key -o StrictHostKeyChecking=no ubuntu@"$HOST" '원격�
   `scripts/ssh-run.sh` 는 `sshpass` 가 없으면 `fail` 이 아니라 `unknown` 을 낸다.
   도구가 없는 것을 구현 실패로 보고하면 안 되기 때문이다.
 
+## VPN 이 소스 IP 를 바꿔 놓을 때
+
+접속 대상이 **출발지 IP 로 허용 목록**을 걸어 두면, VPN 이 default 라우트를 잡는 순간
+나가는 공인 IP 가 바뀌어 방화벽이 조용히 버린다. 거부 응답이 없어 **타임아웃으로만 보인다.**
+
+실제로 겪은 형태 (2026-08-18):
+
+```
+ssh: connect to host <점프호스트> port 10022: Connection timed out
+```
+
+장비는 멀쩡했다. 대상이 회사 공인 IP 에서 온 접속만 받는데, VPN 이 default 를 잡아
+개인 회선 IP 로 나가고 있었던 것이다. **같은 머신의 물리 NIC 으로 나가면 이미 회사 IP** 였는데
+그걸 못 보고 다른 서버를 경유하는 우회로를 찾느라 시간을 썼다.
+
+### 판정
+
+```sh
+ip route get <대상IP>                      # 어느 인터페이스로 나가는가
+ip -d link show wg0 | sed -n 3p            # -> wireguard   (kind 로 판정. 이름 규칙은 못 믿는다)
+ip -4 route show default                   # 터널 밖 default 후보
+curl -s --interface <iface> https://ifconfig.me   # 그 경로로 나갈 때의 공인 IP
+```
+
+터널 kind: `wireguard` `tun` `ppp` `ipip` `ip6tnl` `gre` `gretap` `vti` `sit` `xfrm`.
+**이름(`wg*`/`tun*`)으로 거르지 않는다** - VPN 클라이언트마다 다르다.
+
+후보는 **`ip -4 route show default` 목록에서만** 뽑는다. `oif` 강제 조회는 필터가 못 된다:
+
+```sh
+$ ip route get 203.0.113.1 oif docker0   -> dev docker0 src <docker0 주소>   # 아무 장치나 답을 준다
+```
+
+### 우회
+
+```sh
+ssh -o BindInterface=<iface> ...    # SO_BINDTODEVICE. 라우팅 테이블을 무시하고 그 장치로 내보낸다
+```
+
+`ssh -b <주소>`(BindAddress)로는 **안 된다.** 소스 주소만 바뀌고 경로는 그대로 터널이다:
+
+```sh
+$ ip route get 203.0.113.1 from <물리NIC 주소>   -> dev wg0    # 여전히 터널
+```
+
+`scripts/ssh-run.sh` 는 `VH_BYPASS=<iface>` 가 있을 때만 **1회** 재시도한다.
+
+- 재시도 조건은 `timed out` / `no route to host` / `network is unreachable` / 자체 timeout 뿐이다.
+  **`Connection refused` 와 인증 실패는 제외** - 이미 대상에 도달한 것이라 소스 IP 를 바꿔도 같다.
+- 성공하면 JSON 에 `"via":"bypass:<iface>"` 가 찍힌다. 우회로 얻은 pass 를 평범한 pass 로 두지 않는다.
+- **값은 사용자 승인을 받아 팀장이 확정해서 넘긴다.** 팀원도 스크립트도 인터페이스를 고르지 않는다.
+- 접속 실패로 끝나면 `VH_BYPASS` 유무와 무관하게 **진단이 evidence 에 붙는다.**
+  `ip` 가 없는 환경(Windows Git Bash)에서는 조용히 생략된다.
+
+```
+[진단] 첫 홉 203.0.113.1 는 wg0(kind=wireguard)로 나감. 터널 밖 default 후보: enp7s0(metric 100). 우회 미시도 (VH_BYPASS 미설정)
+```
+
+점프를 쓰면 진단의 첫 홉은 최종 호스트가 아니라 **점프 호스트**다. 로컬에서 나가는 대상이 그것이다.
+
 ## 점프 호스트 2단
 
 ```sh
@@ -147,3 +207,5 @@ done
 - `--since`/`tail` 없는 전체 로그 수집
 - 상한 없는 `until` 폴링 (조건이 틀리면 영원히 돈다)
 - `pgrep -f "<문자열>"` 을 그 문자열이 든 명령 안에서 쓰기 (자기 매칭)
+- 승인 없이 `VH_BYPASS` 를 켜거나 인터페이스를 임의로 고르기
+- 타임아웃을 보고 "장비가 죽었다" 로 단정하기 (소스 IP 차단이 타임아웃으로 보인다)
