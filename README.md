@@ -92,8 +92,9 @@ WSL 을 쓰신다면 리눅스와 같습니다. 아래는 네이티브 Windows �
 | [`CLAUDE.md`](CLAUDE.md) | 모든 프로젝트에 적용되는 작업 규칙 |
 | [`verify-impl/`](verify-impl/) | 실노드에 붙어 구현이 정말 도는지 검증합니다. 서브에이전트 8명이 병렬로 |
 | [`deploy-verify/`](deploy-verify/) | 빌드부터 재기동까지, 단계마다 게이트를 걸어 배포합니다 |
+| [`release-cut/`](release-cut/) | 태그·릴리즈 노트·바이너리·연동 repo 반영까지 순서대로 |
 | [`agents/`](agents/) | verify-impl 이 부리는 전문 서브에이전트 |
-| [`shared/`](shared/) | 동시 세션 감지, 스냅샷, repo 스타일 프로파일러 |
+| [`shared/`](shared/) | 동시 세션 감지, 스냅샷, repo 스타일 프로파일러, 지난 세션 검색, 연동 repo 스캔 |
 | [`hooks/`](hooks/) | 시크릿 유출과 잘못된 커밋 메시지를 커밋 시점에 차단합니다 |
 | [`doctor.sh`](doctor.sh) | 이 환경에서 돌 수 있는지 먼저 봅니다. 아무것도 바꾸지 않습니다 |
 

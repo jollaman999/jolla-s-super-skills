@@ -66,6 +66,7 @@ LINKS=(
   "CLAUDE.md:CLAUDE.md"
   "verify-impl:skills/verify-impl"
   "deploy-verify:skills/deploy-verify"
+  "release-cut:skills/release-cut"
   "shared:skills/shared"
   "hooks:skills/hooks"
 )
