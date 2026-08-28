@@ -27,7 +27,7 @@
 
 같은 이름의 것이 둘 있으면 엉뚱한 걸 보고 판정하게 된다.
 
-> 실제 에이전트는 `cmp-telegraf-demo.service`(`/cmp-agent/sites/<site>/telegraf/bin/cmp-telegraf`) 다.
+> 실제 에이전트는 `<제품>-telegraf-demo.service`(`/<제품>-agent/sites/<site>/telegraf/bin/<제품>-telegraf`) 다.
 > OS 기본 `telegraf.service` 도 (masked 상태로) 떠 있으니 헷갈리지 말 것.
 
 > 실배포 서버의 **SSH 는 포트 22 다. 10022 가 아니다.**

@@ -6,16 +6,16 @@
 
 사용자가 "무엇이 어떻게 보여야 한다"를 말하면 그건 **그대로 판정기준**이다. 재해석하지 않는다.
 
-> "80 포트에서 wordpress, 81포트에서 httpd, 8080에서 바이너리 tomcat, 8081에서 컨테이너 tomcat이 최종 infra101에 있는 vm에서 보여야 하거든?"
+> "80 포트에서 wordpress, 81포트에서 httpd, 8080에서 바이너리 tomcat, 8081에서 컨테이너 tomcat이 최종 타깃 인프라의 vm에서 보여야 하거든?"
 
 이 한 문장이 항목 4개다:
 
 | id | 대상 | 방법 | 절차 | 판정기준 |
 |----|------|------|------|----------|
-| VF-01 | infra101 vm : 80 | ssh | `curl -sS -o /dev/null -w '%{http_code}' localhost:80` + 응답 본문 확인 | wordpress 응답 |
-| VF-02 | infra101 vm : 81 | ssh | 동일, 81 | httpd 응답 |
-| VF-03 | infra101 vm : 8080 | ssh | 동일, 8080 | 바이너리 tomcat 응답 |
-| VF-04 | infra101 vm : 8081 | ssh | 동일, 8081 | 컨테이너 tomcat 응답 |
+| VF-01 | 타깃 vm : 80 | ssh | `curl -sS -o /dev/null -w '%{http_code}' localhost:80` + 응답 본문 확인 | wordpress 응답 |
+| VF-02 | 타깃 vm : 81 | ssh | 동일, 81 | httpd 응답 |
+| VF-03 | 타깃 vm : 8080 | ssh | 동일, 8080 | 바이너리 tomcat 응답 |
+| VF-04 | 타깃 vm : 8081 | ssh | 동일, 8081 | 컨테이너 tomcat 응답 |
 
 규칙:
 - **사용자가 쓴 표현을 판정기준에 그대로 남긴다.** "wordpress 가 보여야 함" 을 "200 응답" 으로 바꾸지 않는다. 200 이 떠도 wordpress 가 아닐 수 있다.
