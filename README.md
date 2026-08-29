@@ -75,10 +75,18 @@ PowerShell 둘뿐입니다. Cygwin 은 경로 표기도 다릅니다 (`/cygdrive
 
 WSL 을 쓰신다면 리눅스와 같습니다. 아래는 네이티브 Windows 기준입니다.
 
-**PowerShell 이나 cmd 가 아니라 Git Bash 를 열고 거기서 `install.sh` 를 실행하세요.**
+**설치는 어느 쪽이든 결국 Git Bash 에서 돌아갑니다.** 여는 방법만 둘입니다.
 
-cmd 나 탐색기에서 시작했다면 `install.bat` 을 쓰세요. Git Bash 를 찾아 `install.sh` 로 넘겨줍니다.
-못 찾으면 무엇을 설치해야 하는지 알려주고 멈춥니다. 설치했는데도 못 찾으면 경로를 직접 지정하세요.
+- Git Bash 를 직접 열었다면 거기서 `./install.sh` 를 실행하세요.
+- cmd 나 탐색기에서 시작했다면 `install.bat` 을 실행하세요. Git Bash 를 찾아 `install.sh` 로 넘겨줍니다.
+
+`install.bat` 이 Git Bash 를 못 찾으면 무엇을 설치해야 하는지 알려주고 멈춥니다.
+탐색기에서 더블클릭했을 때는 그 안내를 읽을 수 있도록 마지막에 키 입력을 기다립니다.
+한글이 깨지지 않게 그 창의 코드페이지를 UTF-8(65001)로 바꾸고 **되돌리지 않습니다** -
+되돌리는 순간 콘솔 버퍼가 지워져 방금 낸 안내가 통째로 사라지기 때문입니다.
+바뀐 것은 그 창 하나뿐이고, 창을 닫으면 원래대로 돌아옵니다.
+
+설치했는데도 못 찾으면 경로를 직접 지정하세요.
 
 ```
 set "CLAUDE_CODE_GIT_BASH_PATH=C:\Program Files\Git\bin\bash.exe"
@@ -87,21 +95,16 @@ set "CLAUDE_CODE_GIT_BASH_PATH=C:\Program Files\Git\bin\bash.exe"
 같은 변수를 Claude Code 도 씁니다. 정식 설치본이 아닌 곳에 Git 을 두었다면
 `settings.json` 의 `env` 에도 같이 넣어야 Bash 도구가 Git Bash 를 찾습니다.
 
-`install.bat` 은 한글이 깨지지 않게 그 창의 코드페이지를 UTF-8(65001)로 바꾸고 **되돌리지 않습니다.**
-되돌리는 순간 콘솔 버퍼가 지워져 방금 낸 안내가 통째로 사라지기 때문입니다.
-바뀐 것은 그 창 하나뿐이고, 창을 닫으면 원래대로 돌아옵니다.
-탐색기에서 더블클릭했을 때는 안내를 읽을 수 있도록 마지막에 키 입력을 기다립니다.
-
 문서에 적힌 `~/.claude/...` 는 Windows 에서 `C:\Users\<이름>\.claude\...` 입니다.
 Git Bash 안에서는 `/c/Users/<이름>/.claude/...` 로 보입니다.
 
 | 항목 | 필요 | 없으면 |
 |------|------|--------|
 | Git for Windows | 필수 | Bash 도구가 PowerShell 로 바뀌어 이 repo 의 스크립트가 하나도 실행되지 않습니다. |
-| 심볼릭 링크 | 개발자 모드 또는 관리자 권한 | `install.sh` 가 켜는 법을 알려주고, 복사로 설치할지 물어봅니다. |
-| SSH 키 (`VH_KEY`) | 원격 검증을 쓸 때 | Windows 의 기본 인증 방식입니다. |
+| 심볼릭 링크 | 개발자 모드 또는 관리자 권한 | 설치 스크립트가 켜는 법을 알려주고, 복사로 설치할지 물어봅니다. |
+| SSH 키 (`VH_KEY`) | 원격 검증을 쓸 때. Windows 의 기본 인증 방식입니다 | 비밀번호 방식으로 가야 하는데, 그건 `sshpass` 가 있어야 합니다. |
 | `sshpass` | 비밀번호 SSH 를 쓸 때만 | 해당 항목이 `unknown` 으로 나옵니다. **키를 쓰는 쪽이 정석입니다.** 깔 방법은 `install.sh --check` (cmd 면 `install.bat --check`) 가 알려줍니다. |
-| `ip` (iproute2) | 안 깔립니다 | Windows 에는 포트가 없습니다. 접속 실패 시 VPN egress 진단만 생략됩니다. |
+| `ip` (iproute2) | 쓰지 않습니다. Windows 에는 포트 자체가 없습니다 | 접속 실패 시 VPN egress 진단만 생략됩니다. |
 | Docker Desktop | 컨테이너 헬스 체크를 쓸 때만 | 그 항목만 건너뜁니다. |
 
 ## 무엇이 들어 있나
@@ -109,7 +112,7 @@ Git Bash 안에서는 `/c/Users/<이름>/.claude/...` 로 보입니다.
 | 구성 | 하는 일 |
 |------|---------|
 | [`CLAUDE.md`](CLAUDE.md) | 모든 프로젝트에 적용되는 작업 규칙입니다. 설치하면 매 세션 자동으로 읽힙니다. |
-| [`verify-impl/`](verify-impl/) | 실노드에 붙어 구현이 정말 실행되는지 검증합니다. 서브에이전트 8명이 나눠 맡아 동시에 확인합니다. |
+| [`verify-impl/`](verify-impl/) | 실노드에 붙어 구현이 정말 실행되는지 검증합니다. 서브에이전트가 탐색·검증·반증·진단을 나눠 맡아 동시에 확인합니다. |
 | [`deploy-verify/`](deploy-verify/) | 빌드부터 재기동까지 배포합니다. 되돌리기 어려운 단계마다 먼저 물어봅니다. |
 | [`release-cut/`](release-cut/) | 태그를 찍고 릴리즈 노트와 바이너리를 올립니다. 따라가야 할 다른 repo 가 있으면 알려줍니다. |
 | [`agents/`](agents/) | verify-impl 이 불러 쓰는 서브에이전트들입니다. 탐색·검증·반증·진단을 나눠 맡습니다. |
