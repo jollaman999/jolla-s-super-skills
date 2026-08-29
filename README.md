@@ -37,6 +37,9 @@ cd ~/ai/skills
 
 클론 위치는 자유입니다. 실행하면 **어디에 설치할지 물어봅니다.**
 
+**Windows 에서 cmd 나 탐색기로 시작했다면** `install.sh` 대신 `install.bat` 을 쓰세요.
+Git Bash 를 찾아 넘겨주며, 아래 옵션은 그대로 전달됩니다. 자세한 것은 [Windows](#windows) 절에 있습니다.
+
 | 범위 | 위치 | 적용 대상 |
 |------|------|-----------|
 | 전역 | `~/.claude` | 모든 프로젝트 |
@@ -84,6 +87,11 @@ set "CLAUDE_CODE_GIT_BASH_PATH=C:\Program Files\Git\bin\bash.exe"
 같은 변수를 Claude Code 도 씁니다. 정식 설치본이 아닌 곳에 Git 을 두었다면
 `settings.json` 의 `env` 에도 같이 넣어야 Bash 도구가 Git Bash 를 찾습니다.
 
+`install.bat` 은 한글이 깨지지 않게 그 창의 코드페이지를 UTF-8(65001)로 바꾸고 **되돌리지 않습니다.**
+되돌리는 순간 콘솔 버퍼가 지워져 방금 낸 안내가 통째로 사라지기 때문입니다.
+바뀐 것은 그 창 하나뿐이고, 창을 닫으면 원래대로 돌아옵니다.
+탐색기에서 더블클릭했을 때는 안내를 읽을 수 있도록 마지막에 키 입력을 기다립니다.
+
 문서에 적힌 `~/.claude/...` 는 Windows 에서 `C:\Users\<이름>\.claude\...` 입니다.
 Git Bash 안에서는 `/c/Users/<이름>/.claude/...` 로 보입니다.
 
@@ -92,7 +100,7 @@ Git Bash 안에서는 `/c/Users/<이름>/.claude/...` 로 보입니다.
 | Git for Windows | 필수 | Bash 도구가 PowerShell 로 바뀌어 이 repo 의 스크립트가 하나도 실행되지 않습니다. |
 | 심볼릭 링크 | 개발자 모드 또는 관리자 권한 | `install.sh` 가 켜는 법을 알려주고, 복사로 설치할지 물어봅니다. |
 | SSH 키 (`VH_KEY`) | 원격 검증을 쓸 때 | Windows 의 기본 인증 방식입니다. |
-| `sshpass` | 비밀번호 SSH 를 쓸 때만 | 해당 항목이 `unknown` 으로 나옵니다. **키를 쓰는 쪽이 정석입니다.** 깔 방법은 `install.sh --check` 가 알려줍니다. |
+| `sshpass` | 비밀번호 SSH 를 쓸 때만 | 해당 항목이 `unknown` 으로 나옵니다. **키를 쓰는 쪽이 정석입니다.** 깔 방법은 `install.sh --check` (cmd 면 `install.bat --check`) 가 알려줍니다. |
 | `ip` (iproute2) | 안 깔립니다 | Windows 에는 포트가 없습니다. 접속 실패 시 VPN egress 진단만 생략됩니다. |
 | Docker Desktop | 컨테이너 헬스 체크를 쓸 때만 | 그 항목만 건너뜁니다. |
 
