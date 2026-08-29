@@ -1,6 +1,6 @@
 @echo off
-rem  한글 메시지가 깨지지 않게 콘솔 코드페이지를 UTF-8 로 바꾸고 끝나면 되돌린다.
-for /f "tokens=2 delims=:" %%a in ('chcp') do for /f "tokens=1 delims=." %%b in ("%%a") do set "OLDCP=%%b"
+rem  한글 메시지가 깨지지 않게 콘솔 코드페이지를 UTF-8 로 바꾼다.
+rem  끝나고 되돌리면 그 순간 콘솔 버퍼가 지워져 방금 낸 안내가 통째로 사라진다. 그래서 되돌리지 않는다.
 chcp 65001 >nul
 rem  cmd 나 탐색기에서 실행했을 때 install.sh 를 Git Bash 로 넘긴다.
 rem  이 파일은 bash 를 찾아 위임하는 것만 한다. 설치 로직은 전부 install.sh 에 있다.
@@ -10,7 +10,6 @@ setlocal
 set "SH=%~dp0install.sh"
 if not exist "%SH%" (
   echo install.sh 를 찾을 수 없습니다: "%SH%"
-  call :restorecp
   exit /b 2
 )
 
@@ -38,7 +37,6 @@ if not defined BASH (
   echo 설치했는데도 이 메시지가 나오면 경로를 직접 지정하고 다시 실행하세요.
   echo   set "CLAUDE_CODE_GIT_BASH_PATH=C:\Program Files\Git\bin\bash.exe"
   echo.
-  call :restorecp
   exit /b 1
 )
 
@@ -46,13 +44,7 @@ rem  bash 에 넘길 때는 역슬래시를 슬래시로 바꾼다. 역슬래시
 set "SHU=%SH:\=/%"
 echo bash: "%BASH%"
 "%BASH%" "%SHU%" %*
-set "RC=%ERRORLEVEL%"
-call :restorecp
-exit /b %RC%
-
-:restorecp
-if defined OLDCP chcp %OLDCP% >nul
-exit /b 0
+exit /b %ERRORLEVEL%
 
 :fromreg
 for /f "tokens=2,*" %%a in ('reg query "%~1\SOFTWARE\GitForWindows" /v InstallPath 2^>nul ^| findstr /i InstallPath') do (
