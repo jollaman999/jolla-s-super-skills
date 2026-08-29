@@ -2,6 +2,7 @@
 # pre-commit + commit-msg 훅을 대상 repo 에 설치한다. 기존 훅이 있으면 체인해서 안 깨뜨린다.
 #
 # usage: install-hooks.sh <repo> [public|private]
+#        install-hooks.sh <repo> --uninstall
 #   프로필을 안 주면 gh 로 공개 여부를 확인해 정한다. 확인 불가면 private.
 #     public  = 시크릿 + 내부 조직명 + 사설IP 차단
 #     private = 시크릿(비밀번호·토큰·개인키)만 차단
@@ -13,16 +14,18 @@ SRCDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 case "$(uname -s 2>/dev/null)" in
   MINGW*|MSYS*|CYGWIN*) export MSYS="${MSYS:+$MSYS }winsymlinks:nativestrict" ;;
 esac
-DIR="${1:?usage: install-hooks.sh <repo> [public|private]}"
+DIR="${1:?usage: install-hooks.sh <repo> [public|private|--uninstall]}"
 WANT="${2:-}"
+MODE=install
+[ "$WANT" = "--uninstall" ] && { MODE=uninstall; WANT=""; }
 
 DIR=$(cd "$DIR" 2>/dev/null && pwd -P) || { echo "경로 없음: $1" >&2; exit 2; }
 GITDIR=$(git -C "$DIR" rev-parse --git-dir 2>/dev/null) || { echo "git repo 아님: $DIR" >&2; exit 2; }
 case "$GITDIR" in /*) ;; *) GITDIR="$DIR/$GITDIR" ;; esac
 HOOKS="$GITDIR/hooks"; mkdir -p "$HOOKS"
 
-# --- 프로필 결정 ---
-if [ -z "$WANT" ]; then
+# --- 프로필 결정 (해제할 때는 필요 없다. gh 를 괜히 부르지 않는다) ---
+if [ "$MODE" = install ] && [ -z "$WANT" ]; then
   RURL=$(git -C "$DIR" remote get-url origin 2>/dev/null || echo "")
   WANT=private
   if [ -n "$RURL" ] && command -v gh >/dev/null 2>&1; then
@@ -34,7 +37,7 @@ if [ -z "$WANT" ]; then
   fi
   [ -z "$RURL" ] && echo "  remote 없음 -> private"
 fi
-case "$WANT" in public|private) ;; *) echo "프로필은 public 또는 private" >&2; exit 2 ;; esac
+[ "$MODE" = install ] && { case "$WANT" in public|private) ;; *) echo "프로필은 public 또는 private" >&2; exit 2 ;; esac; }
 
 # --- 설치 (기존 훅이 있으면 보존해서 체인) ---
 # 링크로 걸고, 링크가 안 되면 복사한다.
@@ -63,6 +66,47 @@ place_hook() { # <훅이름>
 is_mine() { # <파일>
   grep -q 'jolla-skills-hook\|jolla-skills-chain' "$1" 2>/dev/null
 }
+
+# --- 해제 ---
+# 지우기 전에 그 파일이 내가 놓은 것인지 본다. 남이 쓴 훅을 지우면 되돌릴 방법이 없다.
+uninstall_hook() { # <훅이름>
+  local name="$1" target="$HOOKS/$1" orig="$HOOKS/$1.orig"
+  if [ ! -e "$target" ] && [ ! -e "$orig" ]; then
+    echo "  $name: 없음"
+    return
+  fi
+  if [ -e "$target" ]; then
+    if [ -L "$target" ] || is_mine "$target"; then
+      rm -f "$target"
+      echo "  $name: 제거"
+    else
+      echo "  $name: **내가 놓은 게 아니라 그대로 둡니다** (표식 없음)"
+      [ -e "$orig" ] && echo "        $name.orig 도 손대지 않습니다. 어느 쪽이 맞는지 직접 보세요"
+      return
+    fi
+  fi
+  if [ -e "$orig" ]; then
+    if is_mine "$orig"; then
+      echo "  $name.orig: 내 훅 사본이라 제거"
+      rm -f "$orig"
+    else
+      mv "$orig" "$target"
+      chmod +x "$target" 2>/dev/null
+      echo "  $name: 원래 있던 훅 되살림 ($name.orig -> $name)"
+    fi
+  fi
+}
+
+if [ "$MODE" = uninstall ]; then
+  echo "해제: $DIR"
+  uninstall_hook pre-commit
+  uninstall_hook commit-msg
+  [ -f "$HOOKS/.profile" ] && { rm -f "$HOOKS/.profile"; echo "  .profile: 제거"; }
+  if [ -f "$HOOKS/.org-patterns" ]; then
+    echo "  .org-patterns: 사용자가 쓴 목록이라 그대로 둡니다 ($HOOKS/.org-patterns)"
+  fi
+  exit 0
+fi
 
 install_hook() { # <훅이름>
   local name="$1" src="$SRCDIR/$1" target="$HOOKS/$1"
@@ -110,8 +154,6 @@ if [ "$WANT" = public ]; then
     echo "        $ORG_HOME   (한 줄에 정규식 하나)"
   }
 fi
-echo "  해제:   rm $HOOKS/pre-commit $HOOKS/commit-msg $HOOKS/.profile"
-# .orig 를 그냥 두면 원래 훅이 영영 안 돌아온다. 되살리는 명령까지 같이 낸다.
-for n in pre-commit commit-msg; do
-  [ -f "$HOOKS/$n.orig" ] && echo "          mv $HOOKS/$n.orig $HOOKS/$n   # 원래 있던 훅 되살리기"
-done
+# 손으로 rm 하라고 안내하지 않는다. 그 파일이 내 것인지 아닌지를 사람이 매번 가릴 수 없다.
+echo "  해제:   ~/.claude/skills/hooks/install-hooks.sh $DIR --uninstall"
+echo "          내가 놓은 것만 지우고, 원래 있던 훅은 되살립니다"

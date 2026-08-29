@@ -18,21 +18,22 @@
 기본은 심볼릭 링크입니다. **링크를 못 만드는 환경(개발자 모드가 꺼진 Windows)에서는 복사**합니다.
 복사여도 훅은 그대로 동작하지만, 이 repo 를 `git pull` 한 뒤에는 다시 돌려야 갱신됩니다.
 
-해제는 `.git/hooks/` 에서 `pre-commit`, `commit-msg`, `.profile` 을 지우면 됩니다.
+해제는 같은 스크립트로 합니다.
 
 ```sh
-rm .git/hooks/pre-commit .git/hooks/commit-msg .git/hooks/.profile
+~/.claude/skills/hooks/install-hooks.sh <repo> --uninstall
 ```
 
-**원래 훅이 있던 repo 라면 한 줄이 더 필요합니다.** 설치할 때 `<훅이름>.orig` 로 옮겨 뒀기 때문에,
-위 세 개만 지우면 원래 훅이 되살아나지 않고 `.orig` 인 채로 남습니다.
+**손으로 `rm` 하지 마세요.** 그 파일이 내가 놓은 것인지 원래 있던 것인지를 사람이 매번 가릴 수 없습니다.
+해제 모드는 지우기 전에 표식(`jolla-skills-hook` / `jolla-skills-chain`)을 보고 판단합니다.
 
-```sh
-mv .git/hooks/pre-commit.orig .git/hooks/pre-commit    # .orig 가 있을 때만
-mv .git/hooks/commit-msg.orig .git/hooks/commit-msg
-```
-
-설치 스크립트도 끝에 이 명령을 같이 냅니다. `.orig` 가 실제로 있을 때만 나옵니다.
+| 그 repo 의 상태 | 해제하면 |
+|-----------------|----------|
+| 내가 놓은 훅만 있음 | 지웁니다 |
+| 원래 훅이 있어서 체인해 둠 | 체인을 지우고 `<훅이름>.orig` 를 원래 자리로 되살립니다 |
+| **표식이 없는 훅** (내가 놓은 게 아님) | **그대로 둡니다.** 지웠다고 말하지 않습니다 |
+| `.profile` | 지웁니다 (설치할 때 만든 파일) |
+| `.org-patterns` | **그대로 둡니다** (직접 쓰신 목록) |
 
 ## 프로필
 
