@@ -67,15 +67,23 @@ cd ~/ai/skills
 Claude Code 는 Git for Windows 가 있으면 Bash 도구를 Git Bash 로 실행하고,
 없으면 PowerShell 만 씁니다. 이 repo 는 전부 bash 스크립트라 Git Bash 가 있어야 동작합니다.
 
+**Cygwin 과 MSYS2 는 지원 대상이 아닙니다.** Claude Code 가 셸로 쓰는 것은 Git Bash 와
+PowerShell 둘뿐입니다. Cygwin 은 경로 표기도 다릅니다 (`/cygdrive/c/...` 대 `/c/...`).
+
 WSL 을 쓰신다면 리눅스와 같습니다. 아래는 네이티브 Windows 기준입니다.
 
 **PowerShell 이나 cmd 가 아니라 Git Bash 를 열고 거기서 `install.sh` 를 실행하세요.**
 
+문서에 적힌 `~/.claude/...` 는 Windows 에서 `C:\Users\<이름>\.claude\...` 입니다.
+Git Bash 안에서는 `/c/Users/<이름>/.claude/...` 로 보입니다.
+
 | 항목 | 필요 | 없으면 |
 |------|------|--------|
-| Git for Windows | 필수 | Bash 도구 자체가 없어 아무것도 실행되지 않습니다. |
+| Git for Windows | 필수 | Bash 도구가 PowerShell 로 바뀌어 이 repo 의 스크립트가 하나도 실행되지 않습니다. |
 | 심볼릭 링크 | 개발자 모드 또는 관리자 권한 | `install.sh` 가 켜는 법을 알려주고, 복사로 설치할지 물어봅니다. |
-| `sshpass` | 비밀번호 SSH 를 쓸 때만 | 해당 항목이 `unknown` 으로 나옵니다. **SSH 키를 쓰세요** |
+| SSH 키 (`VH_KEY`) | 원격 검증을 쓸 때 | Windows 의 기본 인증 방식입니다. |
+| `sshpass` | 비밀번호 SSH 를 쓸 때만 | 해당 항목이 `unknown` 으로 나옵니다. **키를 쓰는 쪽이 정석입니다.** 깔 방법은 `install.sh --check` 가 알려줍니다. |
+| `ip` (iproute2) | 안 깔립니다 | Windows 에는 포트가 없습니다. 접속 실패 시 VPN egress 진단만 생략됩니다. |
 | Docker Desktop | 컨테이너 헬스 체크를 쓸 때만 | 그 항목만 건너뜁니다. |
 
 ## 무엇이 들어 있나

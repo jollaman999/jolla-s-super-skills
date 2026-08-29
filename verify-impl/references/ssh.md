@@ -15,8 +15,9 @@ timeout 240 ssh -i /path/key -o StrictHostKeyChecking=no ubuntu@"$HOST" '원격�
 - **`ssh -n` 필수** - 없으면 ssh 가 stdin 을 먹어 호출한 스크립트의 남은 줄과 `for`/`until` 루프를 통째로 삼킨다.
 - 일회성 호스트는 `-o UserKnownHostsFile=/dev/null`도 추가.
 - 비밀번호는 **변수로만**. 명령 원문을 evidence에 넣을 때 값이 전개되면 안 된다.
-- **Windows(Git Bash)에는 `sshpass` 가 없다.** 비밀번호 방식은 못 쓴다.
-  키 인증(`VH_KEY`)으로 가거나 WSL 에서 실행한다.
+- **Windows 는 키 인증(`VH_KEY`)이 기본이다.** Git Bash 에 `sshpass` 가 없어 비밀번호 방식이 안 된다.
+  깔 수는 있지만(MSYS2 pacman, Cygwin, winget) Git Bash 의 ssh 와 물리는지는 검증되지 않았다.
+  키로 가거나 WSL 에서 실행한다.
   `scripts/ssh-run.sh` 는 `sshpass` 가 없으면 `fail` 이 아니라 `unknown` 을 낸다.
   도구가 없는 것을 구현 실패로 보고하면 안 되기 때문이다.
 

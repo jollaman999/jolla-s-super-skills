@@ -74,6 +74,7 @@ runs() { # <명령> - 실제로 실행되는지
     find)    find . -maxdepth 0 >/dev/null 2>&1 ;;
     ssh)     ssh -V >/dev/null 2>&1 ;;
     sshpass) sshpass -V >/dev/null 2>&1 ;;
+    ip)      ip -V >/dev/null 2>&1 ;;
     *)       "$1" --version >/dev/null 2>&1 ;;
   esac
 }
@@ -90,6 +91,9 @@ preflight() {
     *)            ENVNAME="$OS" ;;
   esac
   say "환경: $ENVNAME  ($OS)"
+  case "$OS" in
+    CYGWIN*) pf_warn "Cygwin 은 Claude Code 의 지원 셸이 아닙니다 (Git Bash 또는 PowerShell). Git Bash 를 쓰세요" ;;
+  esac
   say "bash: ${BASH_VERSION:-?}"
   say "repo: $REPO"
   say
@@ -108,7 +112,14 @@ preflight() {
   usable curl && pf_ok "curl  ($(command -v curl))" || pf_bad "curl  - Windows 는 Git for Windows 또는 내장 curl 필요"
   if usable timeout || usable gtimeout; then pf_ok "timeout"; else pf_warn "timeout 없음 - 스크립트 내장 워치독으로 대신합니다"; fi
   if usable sshpass; then pf_ok "sshpass (비밀번호 SSH 가능)"
+  elif is_windows; then
+    pf_warn "sshpass 없음 - Windows 는 SSH 키(VH_KEY)가 기본입니다. 비밀번호가 꼭 필요하면:"
+    say "         MSYS2   pacman -S sshpass  (Git Bash 에는 pacman 이 없어 MSYS2 를 따로 깔아야 합니다)"
+    say "         Cygwin  setup-x86_64.exe 에서 sshpass 선택  (Cygwin 자체는 지원 셸이 아닙니다)"
+    say "         winget  winget install xhcoding.sshpass-win32  (Git Bash 의 ssh 와 물리는지는 검증되지 않았습니다)"
   else pf_warn "sshpass 없음 - 비밀번호 SSH 를 못 씁니다. SSH 키(VH_KEY)를 쓰세요"; fi
+  if usable ip; then pf_ok "ip (접속 실패 시 VPN egress 진단 가능)"
+  else pf_warn "ip 없음 - 접속 실패 시 VPN egress 진단이 생략됩니다. Windows 에는 iproute2 포트가 없습니다"; fi
   if usable docker; then pf_ok "docker"; else pf_warn "docker 없음 - 컨테이너 헬스 체크를 못 합니다"; fi
 
   # Git Bash 에서 Windows 내장 OpenSSH 가 먼저 잡히면 /dev/null 같은 POSIX 경로가 안 넘어간다
