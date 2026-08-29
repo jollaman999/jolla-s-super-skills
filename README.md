@@ -74,6 +74,16 @@ WSL 을 쓰신다면 리눅스와 같습니다. 아래는 네이티브 Windows �
 
 **PowerShell 이나 cmd 가 아니라 Git Bash 를 열고 거기서 `install.sh` 를 실행하세요.**
 
+cmd 나 탐색기에서 시작했다면 `install.bat` 을 쓰세요. Git Bash 를 찾아 `install.sh` 로 넘겨줍니다.
+못 찾으면 무엇을 설치해야 하는지 알려주고 멈춥니다. 설치했는데도 못 찾으면 경로를 직접 지정하세요.
+
+```
+set "CLAUDE_CODE_GIT_BASH_PATH=C:\Program Files\Git\bin\bash.exe"
+```
+
+같은 변수를 Claude Code 도 씁니다. 정식 설치본이 아닌 곳에 Git 을 두었다면
+`settings.json` 의 `env` 에도 같이 넣어야 Bash 도구가 Git Bash 를 찾습니다.
+
 문서에 적힌 `~/.claude/...` 는 Windows 에서 `C:\Users\<이름>\.claude\...` 입니다.
 Git Bash 안에서는 `/c/Users/<이름>/.claude/...` 로 보입니다.
 

@@ -6,3 +6,7 @@
 # 확장자가 없어 위 규칙만으로는 놓치기 쉬운 것들
 hooks/pre-commit text eol=lf
 hooks/commit-msg text eol=lf
+
+# .bat 은 CRLF 여야 한다. LF 로 체크아웃되면 cmd 가 라벨과 goto 를 잘못 읽는다.
+*.bat text eol=crlf
+*.cmd text eol=crlf
