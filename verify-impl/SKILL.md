@@ -68,9 +68,10 @@ description: 소스에 구현된 기능을 파악하고, 실제 노드에 SSH로
 
 ```mermaid
 flowchart TD
-  N{{"N 이전 진행 확인"}} -->|이어감| RESUME[미완 노드부터]
+  S{{"S 동시 세션 확인"}} --> N{{"N 이전 진행 확인"}}
+  N -->|이어감| RESUME[미완 노드부터]
   N -->|새로| P{{"P 경로 판정"}}
-  P -->|light| LA["A·B 탐색"] --> LV["즉석 검증 1~3건"] --> G
+  P -->|light| LA["A·B 탐색"] --> LB2{{"B′ 실접속 승인"}} --> LV["즉석 검증 1~3건"] --> G
   P -->|full| A["A 기능 인벤토리<br/><i>verify-inventory</i>"]
   P -->|full| B["B 접속·프론트 탐색<br/><i>verify-target-scout</i>"]
   A --> Q{{"Q 계획 제시 · 시작 신호 대기"}}
