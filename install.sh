@@ -154,7 +154,7 @@ if [ "$UNINSTALL" -eq 1 ]; then
   fi
   say
   say "각 repo 의 .git/hooks 에 깐 훅은 그대로 남습니다."
-  say "지우려면: rm <repo>/.git/hooks/{pre-commit,commit-msg} <repo>/.git/hooks/.profile"
+  say "  지우려면: ~/.claude/skills/hooks/install-hooks.sh <repo> --uninstall"
   exit 0
 fi
 
