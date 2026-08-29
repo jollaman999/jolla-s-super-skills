@@ -378,7 +378,7 @@ id | 대상(file:line 또는 호스트:포트) | 방법 | 절차(복붙 가능�
 각 팀원 반환:
 ```json
 {"host":"10.0.0.11","reachable":true,
- "results":[{"id":"VF-01","verdict":"pass|fail|unknown","evidence":"출력 원문","cmd":"실행 명령"}],
+ "results":[{"id":"VF-01","verdict":"pass|fail|unknown","evidence":"출력 원문","cmd":"실행 명령","via":"direct|bypass:<iface>"}],
  "notes":["범위 밖 발견 사항"]}
 ```
 

@@ -64,13 +64,13 @@ cd ~/ai/skills
 
 네이티브 Windows 에서는 **Git for Windows 가 필요합니다.**
 Claude Code 는 Git for Windows 가 있으면 Bash 도구를 Git Bash 로 돌리고,
-없으면 PowerShell 만 씁니다. 이 repo 는 전부 bash 스크립트라 Git Bash 가 있어야 돕니다.
+없으면 PowerShell 만 씁니다. 이 repo 는 전부 bash 스크립트라 Git Bash 가 있어야 동작합니다.
 
 WSL 을 쓰신다면 리눅스와 같습니다. 아래는 네이티브 Windows 기준입니다.
 
 | 항목 | 필요 | 없으면 |
 |------|------|--------|
-| Git for Windows | 필수 | Bash 도구 자체가 없어 아무것도 안 돕니다 |
+| Git for Windows | 필수 | Bash 도구 자체가 없어 아무것도 실행되지 않습니다 |
 | 심볼릭 링크 | 개발자 모드 또는 관리자 권한 | `install.sh` 가 복사 설치를 제안합니다 |
 | `sshpass` | 비밀번호 SSH 를 쓸 때만 | 해당 항목이 `unknown` 으로 나옵니다. **SSH 키를 쓰세요** |
 | Docker Desktop | 컨테이너 헬스 체크를 쓸 때만 | 그 항목만 건너뜁니다 |

@@ -54,7 +54,7 @@ VH_HOST=10.0.0.11 VH_USER=root VH_PW="$PW" VH_TO=60 \
   "host": "10.0.0.11",
   "reachable": true,
   "results": [
-    {"id":"VF-01","verdict":"pass","evidence":"healthy","cmd":"docker inspect app-svc --format ..."},
+    {"id":"VF-01","verdict":"pass","evidence":"healthy","cmd":"docker inspect app-svc --format ...","via":"direct"},
     {"id":"VF-02","verdict":"fail","evidence":"http=500 body={\"error\":\"nil pointer\"}","cmd":"curl ..."},
     {"id":"VF-03","verdict":"unknown","evidence":"승인되지 않아 미실행 (재기동 필요)","cmd":""}
   ],
@@ -62,6 +62,8 @@ VH_HOST=10.0.0.11 VH_USER=root VH_PW="$PW" VH_TO=60 \
 }
 ```
 
+- `via` 는 `ssh-run.sh` 가 준 값을 그대로 옮긴다. `bypass:<iface>` 면 기본 경로가 아닌 곳으로 붙은 것이라
+  팀장이 그 사실을 알아야 한다. 직접 짠 명령이면 `direct` 다.
 - `evidence` 는 **가공하지 않은 출력**을 넣는다. 요약하지 않는다. 길면 앞뒤로 자르되 자른 것을 표시한다.
 - 비밀번호와 토큰은 `***` 로 가린다.
 - 항목을 빠뜨리지 않는다. 실행 못 한 것도 `unknown` 으로 반드시 넣는다.
