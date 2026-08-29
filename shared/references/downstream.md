@@ -7,7 +7,7 @@
 > "`~/git/terraform/infra` 도 지금 이 구조에 맞게 업데이트 **하라니까**" (같은 지시 3회째)
 > "여기는 이제 고칠 필요 없어 **platform/app-manager 에다** 고쳐"
 
-## 언제 보나
+## 언제 확인하나
 
 **커밋이 끝난 직후.** 작업 단위가 닫히는 시점이다. 그 전에 보면 아직 무엇이 바뀔지 모르고,
 보고까지 끝난 뒤에 보면 이미 늦다.
@@ -27,7 +27,7 @@ DOWNSTREAM_ROOTS=~/git/terraform ~/.claude/skills/shared/scripts/downstream-scan
 
 | 상황 | 행동 |
 |------|------|
-| `.claude/downstream.md` 있음 | 이번 변경에 걸리는 항목만 골라 **보고**한다 |
+| `.claude/downstream.md` 있음 | 이번 변경에 걸리는 항목만 골라 **알린다** |
 | 없음 | 스캔 결과를 보여주고 **어디가 진짜 따라가야 하는 곳인지 묻는다.** 답을 받으면 파일로 기록 |
 | 후보 없음 | 아무 말도 하지 않는다. 없는 걸 있는 것처럼 만들지 않는다 |
 
@@ -49,7 +49,7 @@ DOWNSTREAM_ROOTS=~/git/terraform ~/.claude/skills/shared/scripts/downstream-scan
 | 소스를 고쳤을 때 | `~/git/platform/app-manager` | 같은 내용의 사본. **이쪽이 정본이 되는 시점이 있다** | 빌드가 되는지 |
 | 배포 구조가 바뀌었을 때 | `~/git/terraform/infra` | asset 구조·이미지 태그 | `terraform plan` |
 
-## 걸리지 않는 것
+## 따라갈 필요 없는 것
 - `commonmodel` - 참조는 있으나 우리가 관리하지 않는다
 ```
 
@@ -58,11 +58,11 @@ DOWNSTREAM_ROOTS=~/git/terraform ~/.claude/skills/shared/scripts/downstream-scan
 호스트·계정은 여기 쓰지 않는다. 그건 `.claude/verify-targets.md` 다.
 비밀번호·토큰은 어느 파일에도 쓰지 않는다.
 
-## 자주 어긋나는 형태
+## 주로 이런 데서 어긋난다
 
 | 형태 | 증상 |
 |------|------|
-| compose 에 이미지 태그가 박혀 있음 | 릴리즈했는데 노드는 옛 이미지로 계속 뜬다 |
+| compose 에 이미지 태그가 고정돼 있음 | 릴리즈했는데 노드는 옛 이미지로 계속 뜬다 |
 | 같은 소스의 사본이 두 repo 에 있음 | 한쪽만 고쳐서 빌드 산출물이 갈린다 |
 | terraform/ansible 이 자산 구조를 알고 있음 | 구조를 바꾸면 배포가 조용히 옛 경로를 쓴다 |
 | 릴리즈 노트가 다른 repo 버전을 인용 | `Tested With` 가 실제 배포 버전과 어긋난다 |
