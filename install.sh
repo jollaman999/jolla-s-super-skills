@@ -214,8 +214,10 @@ choose_scope() {
   say
 }
 
+# --check 는 아무것도 안 바꾸므로 설치 범위를 물을 이유가 없다.
+# 물으면 터미널에서 실행할 때 응답을 기다리며 멈춘다.
 if [ -z "$SCOPE" ]; then
-  if ask && [ "$UNINSTALL" -eq 0 ]; then choose_scope; else SCOPE=global; fi
+  if [ "$CHECK" -eq 0 ] && ask && [ "$UNINSTALL" -eq 0 ]; then choose_scope; else SCOPE=global; fi
 fi
 
 if [ "$SCOPE" = project ]; then
