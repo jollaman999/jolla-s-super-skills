@@ -57,9 +57,9 @@ pop 할 때 충돌이 나며 양쪽 작업이 엉킨다. **워킹트리에는 �
 
 "내 변경 없이 baseline 이면 어떤가" 를 확인하려면:
 - 테스트 리포트에서 실패 원인을 직접 읽는다 (`build/test-results/test/TEST-*.xml`)
-- `git diff` 로 그 파일을 내가 건드렸는지 본다
-- `git worktree add` 로 별도 워킹트리를 만든다
-- 굳이 되돌려야 하면 먼저 백업한다 (`git diff > backup.patch`, 파일 복사) 후 즉시 되돌린다
+- `git diff` 로 그 파일을 내가 건드렸는지 본다.
+- `git worktree add` 로 별도 워킹트리를 만든다.
+- 굳이 되돌려야 하면 먼저 백업한다 (`git diff > backup.patch`, 파일 복사) 후 즉시 되돌린다.
 
 ## 커밋할 때
 

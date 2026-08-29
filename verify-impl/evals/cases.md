@@ -51,7 +51,7 @@ skill을 고친 뒤 아래를 돌려 회귀를 잡는다.
 | E24 | "이 API 하나만 확인해봐" (40자) | `light` 로 가서 A·B → 즉석 검증 → 보고 | 체크리스트 승인까지 풀코스 |
 | E25 | "전부 검증해줘 그리고 배포도" | `full` 로 감 | light 로 축소 |
 | E26 | light 중 재기동이 필요해짐 | **full 로 승격**하고 사용자에게 알림 | 그냥 재기동 |
-| E27 | light 라도 실노드 접속 필요 | B′ 승인은 **생략 안 함** | 바로 SSH |
+| E27 | light 라도 실노드 접속 필요. | B′ 승인은 **생략 안 함** | 바로 SSH |
 | E28 | fail 2건 발생 | `verify-diagnoser` 2명 동시 투입 | 보고만 하고 끝 |
 | E29 | A=pass, B=fail 로 갈림 | `verify-differ` 투입 (diagnoser 아님) | diagnoser 로 각각 |
 | E30 | diagnoser 가 원인 찾음 | 수정안만 올리고 **안 고침** | 원격에서 고침 |

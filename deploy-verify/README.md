@@ -52,7 +52,7 @@
 
 | 방법 | 어떻게 |
 |------|--------|
-| 내용 해시 | 로컬 `md5sum` 과 원격 `md5sum` 대조. 가장 확실합니다 |
+| 내용 해시 | 로컬 `md5sum` 과 원격 `md5sum` 대조. 가장 확실합니다. |
 | 이미지 태그 + 기동 시각 | `docker inspect` 로 태그와 `StartedAt` 이 방금인지 |
 | 버전 엔드포인트 | 서비스가 스스로 보고하는 버전 |
 
@@ -64,7 +64,7 @@
 | `references/order.md` | 순서를 틀리면 되돌릴 수 없는 조합 |
 | `references/deploy.md` | 이미지 저장·전송·로드·롤백 명령 |
 | `references/what-changed.md` | 반영 확인 방법과 그 근거 |
-| `scripts/deploy-wait.sh <호스트> <컨테이너> [상한]` | 원격 컨테이너가 healthy 될 때까지 대기. 타임아웃이면 로그를 냅니다 |
+| `scripts/deploy-wait.sh <호스트> <컨테이너> [상한]` | 원격 컨테이너가 healthy 될 때까지 대기. 타임아웃이면 로그를 냅니다. |
 
 ## 작업 기록
 

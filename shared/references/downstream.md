@@ -39,7 +39,7 @@ DOWNSTREAM_ROOTS=~/git/terraform ~/.claude/skills/shared/scripts/downstream-scan
 |------|------|
 | `.claude/downstream.md` 있음 | 이번 변경에 걸리는 항목만 골라 **보고한다** |
 | 없음 | 스캔 결과를 보여주고 **어디가 진짜 따라가야 하는 곳인지 묻는다.** 답을 받으면 파일로 기록 |
-| 후보 없음 | 아무 말도 하지 않는다. 없는 걸 있는 것처럼 만들지 않는다 |
+| 후보 없음 | 아무 말도 하지 않는다. 없는 걸 있는 것처럼 만들지 않는다. |
 
 ## 고치지 않는다
 
@@ -72,7 +72,7 @@ DOWNSTREAM_ROOTS=~/git/terraform ~/.claude/skills/shared/scripts/downstream-scan
 
 | 형태 | 증상 |
 |------|------|
-| compose 에 이미지 태그가 고정돼 있음 | 릴리즈했는데 노드는 옛 이미지로 계속 뜬다 |
-| 같은 소스의 사본이 두 repo 에 있음 | 한쪽만 고쳐서 빌드 산출물이 갈린다 |
-| terraform/ansible 이 자산 구조를 알고 있음 | 구조를 바꾸면 배포가 조용히 옛 경로를 쓴다 |
-| 릴리즈 노트가 다른 repo 버전을 인용 | `Tested With` 가 실제 배포 버전과 어긋난다 |
+| compose 에 이미지 태그가 고정돼 있음 | 릴리즈했는데 노드는 옛 이미지로 계속 뜬다. |
+| 같은 소스의 사본이 두 repo 에 있음 | 한쪽만 고쳐서 빌드 산출물이 갈린다. |
+| terraform/ansible 이 자산 구조를 알고 있음 | 구조를 바꾸면 배포가 조용히 옛 경로를 쓴다. |
+| 릴리즈 노트가 다른 repo 버전을 인용 | `Tested With` 가 실제 배포 버전과 어긋난다. |
