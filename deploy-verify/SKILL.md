@@ -176,7 +176,7 @@ timeout 60 ssh -n root@"$H" "md5sum /data/docker/<산출물> | cut -c1-32"   # �
 timeout 60 ssh -n root@"$H" "docker inspect <svc> --format '{{.Config.Image}} {{.State.StartedAt}}'"
 ```
 
-`ssh -n` 과 `timeout` 은 필수다. 없으면 stdin 을 먹어 루프가 통째로 삼켜진다.
+`ssh -n` 과 `timeout` 은 필수다. 없으면 `ssh` 가 stdin 을 읽어 버려서 호출한 스크립트의 남은 줄이 실행되지 않는다.
 레시피 → `references/deploy.md`
 
 ## 5. 로드·재기동 승인 (블로킹)

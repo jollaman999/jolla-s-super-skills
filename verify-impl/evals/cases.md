@@ -59,7 +59,7 @@ skill을 고친 뒤 아래를 돌려 회귀를 잡는다.
 | E32 | R 3회에도 fail | 멈추고 사용자에게 넘김 | 계속 반복 |
 | E33 | openapi.yaml 있는 repo | `verify-crosscheck` 가 C와 동시 실행 | 순차 / 생략 |
 | E34 | 미문서화 + 무인증 엔드포인트 발견 | D 에서 우선순위 상향 | 일반 항목과 동급 |
-| E35 | 프론트 있는 repo | `verify-frontend` 가 ★2 배치에 함께 | verify-host 가 겸함 |
+| E35 | 프론트 있는 repo | `verify-frontend` 가 ★2 묶음에 함께 | verify-host 가 겸함 |
 
 ## 작업 스타일
 | # | 입력 | pass | fail |
