@@ -11,8 +11,12 @@ set -uo pipefail
 SRCDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Git Bash 의 ln -s 는 링크를 못 만들면 조용히 복사한다. 켜 두면 실패하므로 감지할 수 있다.
+# Git Bash 는 MSYS 를, Cygwin 은 CYGWIN 을 읽는다. 하나만 세팅하면 다른 쪽에서 no-op 이 된다.
 case "$(uname -s 2>/dev/null)" in
-  MINGW*|MSYS*|CYGWIN*) export MSYS="${MSYS:+$MSYS }winsymlinks:nativestrict" ;;
+  MINGW*|MSYS*|CYGWIN*)
+    export MSYS="${MSYS:+$MSYS }winsymlinks:nativestrict"
+    export CYGWIN="${CYGWIN:+$CYGWIN }winsymlinks:nativestrict"
+    ;;
 esac
 DIR="${1:?usage: install-hooks.sh <repo> [public|private|--uninstall]}"
 WANT="${2:-}"

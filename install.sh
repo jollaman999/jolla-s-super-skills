@@ -161,8 +161,10 @@ preflight() {
 # Git Bash 의 ln -s 는 기본 설정에서 링크를 못 만들면 조용히 "복사" 를 한다.
 # 복사가 되면 git pull 해도 반영이 안 되는데 사용자는 링크인 줄 안다.
 # nativestrict 를 켜면 못 만들 때 실패하므로 우리가 감지할 수 있다.
+# Git Bash 는 MSYS 를, Cygwin 은 CYGWIN 을 읽는다. 하나만 세팅하면 다른 쪽에서 no-op 이 된다.
 if is_windows; then
   export MSYS="${MSYS:+$MSYS }winsymlinks:nativestrict"
+  export CYGWIN="${CYGWIN:+$CYGWIN }winsymlinks:nativestrict"
 fi
 
 # 링크 대상: <repo 안 경로>  <설치 위치 안 경로>
