@@ -122,8 +122,19 @@ if [ "$UNINSTALL" -eq 1 ]; then
         if [ -L "$d" ]; then say "  제거   $rel"; run rm -f "$d"
         else say "  건너뜀 $rel   (링크가 아님)"; fi
       else
-        if [ -e "$d" ]; then say "  제거   $rel  (복사본)"; run rm -rf "$d"
-        else say "  건너뜀 $rel   (없음)"; fi
+        # 복사 설치는 비교할 링크가 없다. 설치 기록만 믿고 지우면, 그 사이 사용자가
+        # 같은 자리에 자기 것을 둔 경우 그게 사라진다. 아직 내가 놓은 모양인지 본다.
+        # 설치 경로($rel)로 원본 경로를 되찾는다. 둘은 이름이 다르다
+        # (repo 의 verify-impl -> 설치본의 skills/verify-impl).
+        srcrel=""
+        for e in "${LINKS[@]}"; do [ "${e##*:}" = "$rel" ] && { srcrel="${e%%:*}"; break; }; done
+        if [ ! -e "$d" ]; then say "  건너뜀 $rel   (없음)"
+        elif [ -L "$d" ]; then say "  건너뜀 $rel   (복사본이 아니라 링크로 바뀌어 있음)"
+        elif [ -z "$srcrel" ]; then say "  건너뜀 $rel   (원본을 못 찾음)"
+        elif [ -d "$REPO/$srcrel" ] && [ ! -d "$d" ]; then say "  건너뜀 $rel   (디렉터리였는데 파일로 바뀌어 있음)"
+        elif [ -d "$d" ] && [ -d "$REPO/$srcrel" ] && [ ! -e "$d/$(ls "$REPO/$srcrel" 2>/dev/null | head -1)" ]; then
+          say "  건너뜀 $rel   (내용이 설치 당시와 다름)"
+        else say "  제거   $rel  (복사본)"; run rm -rf "$d"; fi
       fi
     done < <(sed -n 's/^path=//p' "$MANIFEST")
     run rm -f "$MANIFEST"

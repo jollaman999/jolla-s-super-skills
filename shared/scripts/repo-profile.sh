@@ -212,6 +212,8 @@ fi
 OUT=$(cat <<EOF
 # repo 프로필
 
+<!-- generated-by: repo-profile.sh - 손으로 고치면 --save 가 덮어쓰지 않습니다 -->
+
 - 대상: \`$(basename "$DIR")\`
 $OWNER_BLOCK
 - 분석 범위: $SCOPE_NOTE 중 최근 $TOTAL 개 (Revert/Merge 제외)
@@ -256,8 +258,20 @@ EOF
 printf '%s\n' "$OUT"
 
 if [ "$SAVE" -eq 1 ]; then
+  TARGET="$DIR/.claude/repo-profile.md"
+  # 이 스크립트가 만든 파일인지 표식으로 본다. 손으로 고친 것을 말없이 덮으면
+  # 그 repo 의 관례를 사람이 적어 둔 내용이 사라진다.
+  if [ -f "$TARGET" ] && ! grep -q 'generated-by: repo-profile.sh' "$TARGET"; then
+    echo
+    echo "저장하지 않았습니다: $TARGET" >&2
+    echo "  이 스크립트가 만든 파일이 아닙니다 (표식 없음). 손으로 쓰신 내용일 수 있습니다." >&2
+    echo "  덮어쓰려면 그 파일을 먼저 옮기거나 지우고 다시 실행하세요." >&2
+    exit 3
+  fi
   mkdir -p "$DIR/.claude"
-  printf '%s\n' "$OUT" > "$DIR/.claude/repo-profile.md"
+  [ -f "$TARGET" ] && cp "$TARGET" "$TARGET.bak"
+  printf '%s\n' "$OUT" > "$TARGET"
   echo
-  echo "저장: $DIR/.claude/repo-profile.md"
+  echo "저장: $TARGET"
+  [ -f "$TARGET.bak" ] && echo "  이전 내용: $TARGET.bak"
 fi

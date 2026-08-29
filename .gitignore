@@ -15,3 +15,6 @@
 *.tmp
 /tmp/
 .DS_Store
+
+# 프로필 갱신 시 남는 이전 내용
+.claude/repo-profile.md.bak
