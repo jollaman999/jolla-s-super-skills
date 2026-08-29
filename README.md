@@ -49,6 +49,7 @@ cd ~/ai/skills
 ./install.sh --global                # 묻지 않고 전역
 ./install.sh --project ~/work/api    # 그 프로젝트에만
 ./install.sh --copy                  # 링크 대신 복사 (링크를 못 만드는 환경)
+./install.sh --check                 # 이 환경에서 될지만 봅니다. 아무것도 안 바꿉니다
 ./install.sh --dry-run               # 무엇을 할지만 봅니다
 ./install.sh --force                 # 기존 파일을 .bak 으로 옮기고 덮어씁니다
 ./install.sh --uninstall             # 이 스크립트가 설치한 것만 지웁니다
@@ -68,6 +69,8 @@ Claude Code 는 Git for Windows 가 있으면 Bash 도구를 Git Bash 로 실행
 
 WSL 을 쓰신다면 리눅스와 같습니다. 아래는 네이티브 Windows 기준입니다.
 
+**PowerShell 이나 cmd 가 아니라 Git Bash 를 열고 거기서 `install.sh` 를 실행하세요.**
+
 | 항목 | 필요 | 없으면 |
 |------|------|--------|
 | Git for Windows | 필수 | Bash 도구 자체가 없어 아무것도 실행되지 않습니다 |
@@ -86,7 +89,6 @@ WSL 을 쓰신다면 리눅스와 같습니다. 아래는 네이티브 Windows �
 | [`agents/`](agents/) | verify-impl 이 불러 쓰는 서브에이전트들입니다. 탐색·검증·반증·진단을 나눠 맡습니다 |
 | [`shared/`](shared/) | 여러 skill 이 같이 쓰는 도구입니다. 동시 세션 감지, 스냅샷, repo 스타일 파악, 지난 세션 검색, 연동 repo 스캔을 합니다 |
 | [`hooks/`](hooks/) | 시크릿 유출과 잘못된 커밋 메시지를 커밋 시점에 막습니다 |
-| [`doctor.sh`](doctor.sh) | 설치 전에 이 환경에서 실행될 수 있는지 봅니다. 아무것도 바꾸지 않습니다 |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | 이 repo 를 고칠 때의 규칙입니다. 설치해서 쓰는 데는 필요 없습니다 |
 
 각 폴더의 README 에 자세한 내용이 있습니다.

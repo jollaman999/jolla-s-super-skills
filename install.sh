@@ -5,11 +5,12 @@
 #   전역     : ~/.claude       - 모든 프로젝트에 적용된다
 #   프로젝트 : <dir>/.claude   - 그 프로젝트에서만 적용된다
 #
-# usage: install.sh [--global | --project <dir>] [--copy] [--force] [--dry-run] [--uninstall] [--yes]
+# usage: install.sh [--global | --project <dir>] [--copy] [--force] [--dry-run] [--uninstall] [--check] [--yes]
 #   --global      : 전역 설치. CLAUDE_CONFIG_DIR 가 있으면 그쪽을 쓴다
 #   --project DIR : 그 프로젝트 안에만 설치한다 (DIR/.claude)
 #   --copy        : 심볼릭 링크 대신 복사한다. 링크를 못 만드는 환경용
 #   --force       : 이미 있는 일반 파일/디렉터리를 <이름>.bak.<날짜> 로 옮기고 덮어쓴다
+#   --check       : 이 환경에서 실행될 수 있는지만 보고 끝낸다. 아무것도 안 바꾼다
 #   --dry-run     : 무엇을 할지만 출력하고 아무것도 안 바꾼다
 #   --uninstall   : 이 스크립트가 설치한 것만 지운다 (남의 파일은 안 건드린다)
 #   --yes         : 물어보지 않고 기본값(전역·링크)으로 진행한다
@@ -24,7 +25,7 @@ CFG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 MANIFEST_NAME=".jolla-skills.manifest"
 
 SCOPE=""; PROJDIR=""; MODE=""
-FORCE=0; DRY=0; UNINSTALL=0; YES=0
+FORCE=0; DRY=0; UNINSTALL=0; YES=0; CHECK=0
 
 usage() {
   sed -n '3,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
@@ -39,6 +40,7 @@ while [ $# -gt 0 ]; do
     --force)      FORCE=1 ;;
     --dry-run)    DRY=1 ;;
     --uninstall)  UNINSTALL=1 ;;
+    --check)      CHECK=1 ;;
     --yes|-y)     YES=1 ;;
     -h|--help)    usage; exit 0 ;;
     *) echo "모르는 인자: $1" >&2; usage >&2; exit 2 ;;
@@ -53,6 +55,108 @@ run(){ [ "$DRY" -eq 1 ] && { say "    (dry-run) $*"; return 0; }; "$@"; }
 ask(){ [ -t 0 ] && [ "$YES" -eq 0 ]; }
 
 is_windows() { case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) return 0 ;; *) return 1 ;; esac; }
+
+# --- 사전 점검 ---
+# 설치 전에 이 환경에서 실행될 수 있는지 본다. 아무것도 바꾸지 않는다.
+# Windows 에서 "왜 안 되지" 를 검증 도중에 알게 되는 것을 막기 위한 것이다.
+PF_FAIL=0; PF_WARN=0
+pf_ok()   { say "  [ok]   $*"; }
+pf_warn() { say "  [주의] $*"; PF_WARN=$((PF_WARN+1)); }
+pf_bad()  { say "  [없음] $*"; PF_FAIL=$((PF_FAIL+1)); }
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# 있다는 것과 실행되는 것은 다르다. PATH 에 스텁이 놓여 있는 경우가 실제로 있다.
+runs() { # <명령> - 실제로 실행되는지
+  case "$1" in
+    sed)     printf 'x' | sed 's/x/y/' >/dev/null 2>&1 ;;
+    grep)    printf 'x\n' | grep -q x 2>/dev/null ;;
+    awk)     printf 'x\n' | awk '{print}' >/dev/null 2>&1 ;;
+    find)    find . -maxdepth 0 >/dev/null 2>&1 ;;
+    ssh)     ssh -V >/dev/null 2>&1 ;;
+    sshpass) sshpass -V >/dev/null 2>&1 ;;
+    *)       "$1" --version >/dev/null 2>&1 ;;
+  esac
+}
+usable() { have "$1" && runs "$1"; }
+
+preflight() {
+  local OS ENVNAME H PY SSHBIN CRLF f c
+  OS=$(uname -s 2>/dev/null || echo unknown)
+  case "$OS" in
+    MINGW*|MSYS*) ENVNAME="Windows (Git Bash)" ;;
+    CYGWIN*)      ENVNAME="Windows (Cygwin)" ;;
+    Linux*)       if grep -qi microsoft /proc/version 2>/dev/null; then ENVNAME="WSL"; else ENVNAME="Linux"; fi ;;
+    Darwin*)      ENVNAME="macOS" ;;
+    *)            ENVNAME="$OS" ;;
+  esac
+  say "환경: $ENVNAME  ($OS)"
+  say "bash: ${BASH_VERSION:-?}"
+  say "repo: $REPO"
+  say
+
+  say "[필수]"
+  for c in bash awk sed grep find git; do
+    if   usable "$c"; then pf_ok "$c"
+    elif have "$c";   then pf_bad "$c - PATH 에 있지만 실행되지 않습니다 ($(command -v "$c"))"
+    else                   pf_bad "$c"
+    fi
+  done
+
+  say
+  say "[검증에 필요]"
+  usable ssh  && pf_ok "ssh   ($(command -v ssh))"  || pf_bad "ssh   - Windows 는 Git for Windows 설치 필요"
+  usable curl && pf_ok "curl  ($(command -v curl))" || pf_bad "curl  - Windows 는 Git for Windows 또는 내장 curl 필요"
+  if usable timeout || usable gtimeout; then pf_ok "timeout"; else pf_warn "timeout 없음 - 스크립트 내장 워치독으로 대신합니다"; fi
+  if usable sshpass; then pf_ok "sshpass (비밀번호 SSH 가능)"
+  else pf_warn "sshpass 없음 - 비밀번호 SSH 를 못 씁니다. SSH 키(VH_KEY)를 쓰세요"; fi
+  if usable docker; then pf_ok "docker"; else pf_warn "docker 없음 - 컨테이너 헬스 체크를 못 합니다"; fi
+
+  # Git Bash 에서 Windows 내장 OpenSSH 가 먼저 잡히면 /dev/null 같은 POSIX 경로가 안 넘어간다
+  if is_windows; then
+    SSHBIN=$(command -v ssh 2>/dev/null || echo "")
+    case "$SSHBIN" in
+      /c/Windows/*|/C/Windows/*) pf_warn "ssh 가 Windows 내장 OpenSSH 입니다 ($SSHBIN). Git Bash 의 /usr/bin/ssh 가 먼저 오게 PATH 를 조정하세요" ;;
+    esac
+  fi
+
+  say
+  say "[해시·JSON]"
+  H=""
+  for c in md5sum sha1sum shasum cksum; do
+    have "$c" && printf 'x' | "$c" >/dev/null 2>&1 && { H="$c"; break; }
+  done
+  [ -n "$H" ] && pf_ok "해시 도구: $H (snapshot.sh 용)" || pf_bad "md5sum/sha1sum/shasum/cksum 이 전부 없거나 실행되지 않습니다"
+  PY=""
+  for c in python3 python py; do
+    have "$c" && "$c" -c 'import sys' >/dev/null 2>&1 && { PY="$c"; break; }
+  done
+  [ -n "$PY" ] && pf_ok "python: $PY (지난 세션 검색과 최근 편집 목록에 씁니다)" \
+               || pf_warn "python 없음 - 세션 감지는 되지만 지난 세션 검색과 최근 편집 목록은 못 씁니다"
+
+  say
+  say "[줄바꿈]"
+  CRLF=0
+  for f in "$REPO"/install.sh "$REPO"/hooks/pre-commit "$REPO"/shared/scripts/session-guard.sh; do
+    [ -f "$f" ] || continue
+    head -1 "$f" | grep -q $'\r' && CRLF=1
+  done
+  if [ "$CRLF" -eq 1 ]; then
+    pf_bad "스크립트가 CRLF 로 체크아웃돼 있습니다 (bad interpreter 로 실행이 안 됩니다)"
+    say "         고치기: git -C \"$REPO\" config core.autocrlf false && git -C \"$REPO\" checkout -- ."
+  else
+    pf_ok "LF (.gitattributes 로 고정돼 있습니다)"
+  fi
+
+  say
+  say "[Claude Code 설정]"
+  [ -d "$CFG" ] && pf_ok "설정 디렉터리: $CFG" || pf_warn "설정 디렉터리가 없습니다: $CFG (Claude Code 를 한 번 실행하면 생깁니다)"
+  if [ -d "$CFG/projects" ]; then
+    pf_ok "세션 기록: $CFG/projects ($(find "$CFG/projects" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | grep -c . ) 개 프로젝트)"
+  else
+    pf_warn "세션 기록 디렉터리가 없습니다 - 동시 세션 감지가 '확인 불가(exit 2)' 로 나옵니다"
+  fi
+  say
+}
 
 # Git Bash 의 ln -s 는 기본 설정에서 링크를 못 만들면 조용히 "복사" 를 한다.
 # 복사가 되면 git pull 해도 반영이 안 되는데 사용자는 링크인 줄 안다.
@@ -180,6 +284,24 @@ link_failed_notice() {
   fi
   say
 }
+
+# --check 는 점검만 하고 끝낸다. 예전 doctor.sh 가 하던 일이다.
+if [ "$CHECK" -eq 1 ]; then
+  preflight
+  if [ "$PF_FAIL" -gt 0 ]; then
+    say "필수 항목 ${PF_FAIL}개가 빠졌습니다. 주의 ${PF_WARN}개."
+    exit 1
+  fi
+  say "필수 항목은 전부 있습니다. 주의 ${PF_WARN}개."
+  exit 0
+fi
+
+# 설치 전에 점검한다. 필수가 빠진 채로 깔아 두면 검증 도중에 알게 된다.
+preflight
+if [ "$PF_FAIL" -gt 0 ]; then
+  say "필수 항목 ${PF_FAIL}개가 빠졌습니다. 위를 갖춘 뒤 다시 실행하세요."
+  exit 1
+fi
 
 if [ -z "$MODE" ] && [ "$DRY" -eq 0 ]; then
   if symlink_works "$DEST"; then
