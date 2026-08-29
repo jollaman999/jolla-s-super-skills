@@ -126,5 +126,5 @@ GPU 텔레메트리가 0건인 게 정상인데, 코드만 봐서는 알 수 없
 | `verify-run.sh <id> <기대코드> <curl 인자...>` | 한 항목을 실행하고 결정적으로 판정, JSON 반환 |
 | `ssh-run.sh` | 원격 실행. timeout, 점프호스트, 시크릿 마스킹, 접속 실패 시 경로 진단 내장 |
 | `health-wait.sh <url\|docker:이름> [상한] [간격]` | 헬스 통과까지 상한을 두고 폴링. 무한 대기 없음 |
-| `probe.sh <base_url> [path]` | 도달성 확인. 실패하면 해당 항목은 `unknown` |
+| `probe.sh <base_url> [path]` | 도달성 확인. 실패하면 그 항목은 `unknown` |
 | `scan-targets.sh [repo]` | 접속 대상 후보 스캔. **값은 안 찍고 변수명과 위치만** |
