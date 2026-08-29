@@ -53,7 +53,7 @@ echo
 echo "훑은 범위: $PARENT/* ${DOWNSTREAM_ROOTS:+· $DOWNSTREAM_ROOTS}"
 echo
 
-# 버전이 고정된 줄. 여기를 안 고치면 배포는 성공하고 옛 버전이 돈다.
+# 버전이 고정된 줄. 여기를 안 고치면 배포는 성공하고 옛 버전이 실행된다.
 echo "## 버전이 고정돼 있는 곳 (반영을 빠뜨려도 티가 안 나는 자리)"
 echo
 PINNED=0

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 같은 프로젝트에서 다른 Claude 세션이 동시에 돌고 있는지 확인한다.
+# 같은 프로젝트에서 다른 Claude 세션이 동시에 실행 중인지 확인한다.
 # 충돌 위험을 판단하기 위한 정보 수집용. 판단은 호출한 쪽이 한다.
 #
 # usage: session-guard.sh [project_dir] [idle_min]

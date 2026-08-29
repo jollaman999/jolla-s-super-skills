@@ -50,7 +50,7 @@ place_hook() { # <훅이름>
   rm -rf "$target"
   if cp "$src" "$target" 2>/dev/null; then
     chmod +x "$target" 2>/dev/null
-    echo "  $name: 복사 (링크를 못 만드는 환경). repo 갱신 후 이 스크립트를 다시 돌리세요"
+    echo "  $name: 복사 (링크를 못 만드는 환경). repo 갱신 후 이 스크립트를 다시 실행하세요"
     return 0
   fi
   echo "  $name: 설치 실패" >&2

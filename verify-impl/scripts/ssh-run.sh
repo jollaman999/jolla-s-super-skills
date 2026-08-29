@@ -71,7 +71,7 @@ emit() { # <verdict>
 }
 
 # --- 사전 점검 ---
-# 도구가 없어서 못 도는 것을 fail(=구현이 틀렸다)로 보고하면 안 된다. unknown 이다.
+# 도구가 없어서 실행 못 하는 것을 fail(=구현이 틀렸다)로 보고하면 안 된다. unknown 이다.
 PRE=""
 if ! have ssh; then
   PRE="ssh 명령이 없습니다. Windows 는 Git for Windows 를 설치하고 Git Bash 에서 실행하세요"

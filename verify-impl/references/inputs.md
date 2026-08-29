@@ -44,7 +44,7 @@ echo "$JWT" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | python3 -c \
   'import sys,json,datetime; d=json.load(sys.stdin); print("exp:", datetime.datetime.fromtimestamp(d["exp"]))'
 ```
 
-만료됐으면 **검증을 시작하기 전에** 새 토큰을 요청한다. 이미 만료된 것을 알고도 돌리지 않는다.
+만료됐으면 **검증을 시작하기 전에** 새 토큰을 요청한다. 이미 만료된 것을 알고도 실행하지 않는다.
 
 정리 규칙:
 - 붙여넣은 curl 은 **그대로 실행하지 않는다.** `-H` 를 다 옮기지 말고 인증·콘텐츠타입만 남긴다. `sec-ch-ua`, `referer` 같은 브라우저 헤더는 뺀다.

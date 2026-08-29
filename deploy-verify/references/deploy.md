@@ -88,7 +88,7 @@ timeout 400 ssh -n root@"$H" "cp /app-config/application.yaml.bak.<ts> /app-conf
    `[m]cc` 처럼 대괄호로 깨거나, 종료 표식 파일(`test -f /tmp/x.done`)을 쓴다.
 2. **`until` 에 횟수 상한을 건다.** `scripts/deploy-wait.sh` 는 이미 상한이 들어 있다.
 
-폴링 전에 **기다릴 대상이 실제로 돌고 있는지** 먼저 본다. 이미 끝났으면 폴링할 이유가 없다.
+폴링 전에 **기다릴 대상이 실제로 실행 중인지** 먼저 본다. 이미 끝났으면 폴링할 이유가 없다.
 
 ## 금지
 

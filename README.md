@@ -63,7 +63,7 @@ cd ~/ai/skills
 ## Windows
 
 네이티브 Windows 에서는 **Git for Windows 가 필요합니다.**
-Claude Code 는 Git for Windows 가 있으면 Bash 도구를 Git Bash 로 돌리고,
+Claude Code 는 Git for Windows 가 있으면 Bash 도구를 Git Bash 로 실행하고,
 없으면 PowerShell 만 씁니다. 이 repo 는 전부 bash 스크립트라 Git Bash 가 있어야 동작합니다.
 
 WSL 을 쓰신다면 리눅스와 같습니다. 아래는 네이티브 Windows 기준입니다.
@@ -90,13 +90,13 @@ WSL 을 쓰신다면 리눅스와 같습니다. 아래는 네이티브 Windows �
 | 구성 | 하는 일 |
 |------|---------|
 | [`CLAUDE.md`](CLAUDE.md) | 모든 프로젝트에 적용되는 작업 규칙 |
-| [`verify-impl/`](verify-impl/) | 실노드에 붙어 구현이 정말 도는지 검증합니다. 서브에이전트 8명이 병렬로 |
+| [`verify-impl/`](verify-impl/) | 실노드에 붙어 구현이 정말 실행되는지 검증합니다. 서브에이전트 8명이 병렬로 |
 | [`deploy-verify/`](deploy-verify/) | 빌드부터 재기동까지, 단계마다 게이트를 걸어 배포합니다 |
 | [`release-cut/`](release-cut/) | 태그·릴리즈 노트·바이너리·연동 repo 반영까지 순서대로 |
 | [`agents/`](agents/) | verify-impl 이 부리는 전문 서브에이전트 |
 | [`shared/`](shared/) | 동시 세션 감지, 스냅샷, repo 스타일 프로파일러, 지난 세션 검색, 연동 repo 스캔 |
 | [`hooks/`](hooks/) | 시크릿 유출과 잘못된 커밋 메시지를 커밋 시점에 차단합니다 |
-| [`doctor.sh`](doctor.sh) | 이 환경에서 돌 수 있는지 먼저 봅니다. 아무것도 바꾸지 않습니다 |
+| [`doctor.sh`](doctor.sh) | 이 환경에서 실행될 수 있는지 먼저 봅니다. 아무것도 바꾸지 않습니다 |
 
 각 폴더의 README 에 자세한 내용이 있습니다.
 
@@ -116,7 +116,7 @@ WSL 을 쓰신다면 리눅스와 같습니다. 아래는 네이티브 Windows �
 ## 고칠 때
 
 문서끼리의 참조는 skill 폴더 기준 상대경로로, **실행되는 명령은 `~/.claude/skills/...` 절대경로**로 씁니다.
-명령이 도는 시점의 위치는 사용자 프로젝트이지 skill 폴더가 아니기 때문입니다.
+명령이 실행되는 시점의 위치는 사용자 프로젝트이지 skill 폴더가 아니기 때문입니다.
 클론 위치는 어느 문서에도 넣지 않습니다.
 
 ## 라이선스

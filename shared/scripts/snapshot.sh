@@ -15,7 +15,7 @@ CMD="${1:?take|drift|clean}"; shift
 have() { command -v "$1" >/dev/null 2>&1; }
 
 pick_hash() { # 쓸 수 있는 해시 도구 하나
-  # 있다는 것과 도는 것은 다르다. 실제로 한 번 돌려 본다.
+  # 있다는 것과 실행되는 것은 다르다. 실제로 한 번 돌려 본다.
   # (Windows 에는 실행하면 바로 죽는 스텁이 PATH 에 놓이는 경우가 있다)
   for h in md5sum sha1sum shasum cksum; do
     have "$h" || continue
@@ -25,7 +25,7 @@ pick_hash() { # 쓸 수 있는 해시 도구 하나
 }
 
 hashes() { # <dir> <해시도구> - 추적 대상 파일의 해시 목록
-  # 해시 도구는 호출자의 cwd 에서 돈다. git -C 로 목록만 받으면 경로가 안 맞아
+  # 해시 도구는 호출자의 cwd 에서 실행된다. git -C 로 목록만 받으면 경로가 안 맞아
   # 거의 모든 파일이 조용히 빠진다. 반드시 그 디렉터리 안에서 실행한다.
   ( cd "$1" 2>/dev/null && git ls-files -z 2>/dev/null | xargs -0 -r "$2" 2>/dev/null ) | sort -k2
 }
@@ -67,7 +67,7 @@ drift)
   BASE_N=$(wc -l < "$SNAP/.snap-base.md5"); NOW_N=$(wc -l < "$SNAP/.snap-now.md5")
   if [ "$BASE_N" -eq 0 ] || [ "$NOW_N" -eq 0 ]; then
     echo "확인 불가: 해시 목록이 비었습니다 (기준 ${BASE_N}줄 / 현재 ${NOW_N}줄)" >&2
-    echo "  '변경 없음' 과 구분할 수 없습니다. $HASH 이 제대로 도는지 확인하세요" >&2
+    echo "  '변경 없음' 과 구분할 수 없습니다. $HASH 이 제대로 실행되는지 확인하세요" >&2
     exit 2
   fi
   if diff -q "$SNAP/.snap-base.md5" "$SNAP/.snap-now.md5" >/dev/null 2>&1; then

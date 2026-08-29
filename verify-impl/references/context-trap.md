@@ -4,9 +4,9 @@
 
 ## 1. 실행 주체가 다르면 결과가 다르다
 
-**내가 손으로 돌린 결과는 실제 운영에서 도는 결과가 아니다.**
+**내가 손으로 실행한 결과는 실제 운영에서 실행되는 결과가 아니다.**
 
-> 노드에서 `gpu_vm_mapping.sh` 를 일반 유저로 직접 돌리면 rootless podman 이 `nova_libvirt` 를 못 봐
+> 노드에서 `gpu_vm_mapping.sh` 를 일반 유저로 직접 실행하면 rootless podman 이 `nova_libvirt` 를 못 봐
 > `status=unassigned` 가 나온다. **에이전트는 root 라 정상**(`status=assigned`).
 > 수동 실행 결과로 "매핑 안 됨" 이라 판단하지 말 것.
 

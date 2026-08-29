@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 이 repo 가 이 환경에서 돌 수 있는지 먼저 본다. 아무것도 바꾸지 않는다.
+# 이 repo 가 이 환경에서 실행될 수 있는지 먼저 본다. 아무것도 바꾸지 않는다.
 #
 # usage: ./doctor.sh
 # exit : 0=필수 항목 전부 있음  1=필수 항목이 빠짐
@@ -17,7 +17,7 @@ bad()  { printf '  [없음] %s\n' "$*"; FAIL=$((FAIL+1)); }
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
-# 있다는 것과 도는 것은 다르다. PATH 에 스텁이 놓여 있는 경우가 실제로 있다.
+# 있다는 것과 실행되는 것은 다르다. PATH 에 스텁이 놓여 있는 경우가 실제로 있다.
 runs() { # <명령> - 실제로 실행되는지
   case "$1" in
     sed)  printf 'x' | sed 's/x/y/' >/dev/null 2>&1 ;;
