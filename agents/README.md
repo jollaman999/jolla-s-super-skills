@@ -1,6 +1,6 @@
 # agents
 
-[`verify-impl`](../verify-impl/) 이 부리는 전문 서브에이전트 8종입니다.
+[`verify-impl`](../verify-impl/) 이 불러 쓰는 전문 서브에이전트 8종입니다.
 설치하면 `~/.claude/agents/` 에 걸립니다.
 
 ## 왜 나눴나
