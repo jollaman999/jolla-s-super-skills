@@ -27,7 +27,7 @@ DOWNSTREAM_ROOTS=~/git/terraform ~/.claude/skills/shared/scripts/downstream-scan
 
 | 상황 | 행동 |
 |------|------|
-| `.claude/downstream.md` 있음 | 이번 변경에 걸리는 항목만 골라 **알린다** |
+| `.claude/downstream.md` 있음 | 이번 변경에 걸리는 항목만 골라 **보고한다** |
 | 없음 | 스캔 결과를 보여주고 **어디가 진짜 따라가야 하는 곳인지 묻는다.** 답을 받으면 파일로 기록 |
 | 후보 없음 | 아무 말도 하지 않는다. 없는 걸 있는 것처럼 만들지 않는다 |
 
