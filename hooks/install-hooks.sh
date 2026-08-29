@@ -85,6 +85,7 @@ install_hook() { # <훅이름>
 exec "$src" "\$@"
 CHAIN
       chmod +x "$target"
+      CHAINED="${CHAINED:+$CHAINED }$name"
       echo "  $name: 기존 훅 보존 -> $name.orig 로 옮기고 체인"
     fi
   else
@@ -100,7 +101,7 @@ echo "설치 완료: $DIR"
 echo "  훅:     $HOOKS/{pre-commit,commit-msg}"
 echo "  프로필: $WANT"
 [ "$WANT" = private ] && echo "  -> 비밀번호·토큰·개인키만 차단합니다"
-[ "$WANT" = public ]  && echo "  -> 시크릿 + 내부 조직명 + 사설IP 를 차단합니다"
+[ "$WANT" = public ]  && echo "  -> 시크릿 + 사내 이름 + 문서용이 아닌 IP 를 차단합니다"
 echo "  -> em dash 와 커밋 메시지 규칙은 프로필과 무관하게 검사합니다"
 if [ "$WANT" = public ]; then
   ORG_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hook-org-patterns"
@@ -110,3 +111,7 @@ if [ "$WANT" = public ]; then
   }
 fi
 echo "  해제:   rm $HOOKS/pre-commit $HOOKS/commit-msg $HOOKS/.profile"
+# .orig 를 그냥 두면 원래 훅이 영영 안 돌아온다. 되살리는 명령까지 같이 낸다.
+for n in pre-commit commit-msg; do
+  [ -f "$HOOKS/$n.orig" ] && echo "          mv $HOOKS/$n.orig $HOOKS/$n   # 원래 있던 훅 되살리기"
+done

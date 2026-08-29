@@ -20,6 +20,20 @@
 
 해제는 `.git/hooks/` 에서 `pre-commit`, `commit-msg`, `.profile` 을 지우면 됩니다.
 
+```sh
+rm .git/hooks/pre-commit .git/hooks/commit-msg .git/hooks/.profile
+```
+
+**원래 훅이 있던 repo 라면 한 줄이 더 필요합니다.** 설치할 때 `<훅이름>.orig` 로 옮겨 뒀기 때문에,
+위 세 개만 지우면 원래 훅이 되살아나지 않고 `.orig` 인 채로 남습니다.
+
+```sh
+mv .git/hooks/pre-commit.orig .git/hooks/pre-commit    # .orig 가 있을 때만
+mv .git/hooks/commit-msg.orig .git/hooks/commit-msg
+```
+
+설치 스크립트도 끝에 이 명령을 같이 냅니다. `.orig` 가 실제로 있을 때만 나옵니다.
+
 ## 프로필
 
 공개 repo 와 사내 repo 는 막아야 할 것이 다릅니다.

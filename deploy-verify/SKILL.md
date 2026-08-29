@@ -27,14 +27,14 @@ description: 고친 소스를 실제 노드에 반영하고 반영됐는지 확�
 | 1b | **재빌드냐 파일 교체냐 판정** | 1 | - | 고친 파일이 마운트인지 이미지인지 확정 |
 | 2 | 빌드 | 1 | - | exit 0. 실패하면 여기서 멈춘다 |
 | 3 | **커밋·태그·push 승인** | 2 | - | 블로킹. 커밋 메시지 초안 제시 |
-| 4 | 자산 전송 | 3 | ★1 호스트별 | scp 성공 |
+| 4 | 자산 전송 | 3 | ★1 호스트별 | scp 성공. 여기까지는 서비스를 안 건드린다 |
 | 5 | **로드·재기동 승인** | 4 | - | 블로킹. 중단 영향 고지 |
 | 6 | 로드 + 재기동 | 5 | ★1 호스트별 | 명령 exit 0 |
 | 7 | 헬스 대기 | 6 | ★1 호스트별 | healthy. 상한 내 미달성이면 로그부터 |
 | 8 | **반영 확인** | 7 | ★1 호스트별 | md5/이미지태그/버전 일치 |
 | 9 | 실증 | 8 | - | `verify-impl` 로 넘긴다 |
 
-★1 = 호스트별 동시. 4·6·7·8 을 호스트 하나가 이어서 처리한다.
+★1 = 호스트별 동시. 4 를 먼저 끝내고 5 에서 승인을 받은 뒤, 6·7·8 을 호스트 하나가 이어서 처리한다.
 
 ## 0. 동시 세션 확인
 
@@ -159,25 +159,15 @@ md5sum <산출물> | cut -c1-32
 - 태그가 필요하면 기존 태그 규칙을 확인하고 제시
 - `push --force` 는 별도로 다시 묻는다
 
-## 4·6·7·8. 호스트별 배포 [★1]
+## 4. 자산 전송 [★1 호스트별]
 
-호스트 하나 = 한 흐름. 여러 호스트면 **동시에** 진행한다.
+호스트 하나 = 한 흐름. 여러 호스트면 **동시에** 진행한다. 전송까지는 서비스를 건드리지 않는다.
 
 ```sh
-# 4. 전송
 timeout 300 scp -o StrictHostKeyChecking=no <산출물> root@"$H":/data/docker/
-# 6. 로드 + 재기동
-timeout 400 ssh -n -o StrictHostKeyChecking=no root@"$H" \
-  "docker load -i /data/docker/<이미지>.tar && bash /data/scripts/run_<svc>.sh"
-# 7. 헬스 대기
-scripts/deploy-wait.sh "$H" <컨테이너> 120
-# 8. 반영 확인
-timeout 60 ssh -n root@"$H" "md5sum /data/docker/<산출물> | cut -c1-32"   # 로컬 해시와 대조
-timeout 60 ssh -n root@"$H" "docker inspect <svc> --format '{{.Config.Image}} {{.State.StartedAt}}'"
 ```
 
 `ssh -n` 과 `timeout` 은 필수다. 없으면 `ssh` 가 stdin 을 읽어 버려서 호출한 스크립트의 남은 줄이 실행되지 않는다.
-레시피 → `references/deploy.md`
 
 ## 5. 로드·재기동 승인 (블로킹)
 
@@ -190,7 +180,24 @@ timeout 60 ssh -n root@"$H" "docker inspect <svc> --format '{{.Config.Image}} {{
 
 운영 호스트가 여러 대면 **한 대씩 할지 동시에 할지 묻는다.** 전부 동시에 내리면 서비스가 통째로 끊긴다.
 
-## 7. 헬스 대기 - 안 뜨면
+## 6·7·8. 로드 · 재기동 · 헬스 · 반영 확인 [★1 호스트별]
+
+승인이 난 뒤에만 여기로 온다. 호스트 하나가 넷을 이어서 처리한다.
+
+```sh
+# 6. 로드 + 재기동
+timeout 400 ssh -n -o StrictHostKeyChecking=no root@"$H" \
+  "docker load -i /data/docker/<이미지>.tar && bash /data/scripts/run_<svc>.sh"
+# 7. 헬스 대기
+~/.claude/skills/deploy-verify/scripts/deploy-wait.sh "$H" <컨테이너> 120
+# 8. 반영 확인
+timeout 60 ssh -n root@"$H" "md5sum /data/docker/<산출물> | cut -c1-32"   # 로컬 해시와 대조
+timeout 60 ssh -n root@"$H" "docker inspect <svc> --format '{{.Config.Image}} {{.State.StartedAt}}'"
+```
+
+레시피 → `references/deploy.md`
+
+### 헬스가 안 뜨면
 
 **로그를 먼저 본다.** 재시도부터 하지 않는다.
 ```sh
@@ -198,7 +205,7 @@ timeout 60 ssh -n root@"$H" "docker logs --tail 80 --since 5m <svc> 2>&1"
 ```
 상한 내에 안 뜨면 멈추고 사용자에게 보고한다. 롤백할지 묻는다.
 
-## 8. 반영 확인 - 가장 자주 놓치는 단계
+### 반영 확인 - 가장 자주 놓치는 단계
 
 "고쳤는데 반영이 안 된" 상황이 여기서 걸린다. 셋 중 최소 하나로 확인한다:
 
