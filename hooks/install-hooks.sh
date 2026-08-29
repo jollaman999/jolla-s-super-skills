@@ -102,4 +102,11 @@ echo "  프로필: $WANT"
 [ "$WANT" = private ] && echo "  -> 비밀번호·토큰·개인키만 차단합니다"
 [ "$WANT" = public ]  && echo "  -> 시크릿 + 내부 조직명 + 사설IP 를 차단합니다"
 echo "  -> em dash 와 커밋 메시지 규칙은 프로필과 무관하게 검사합니다"
+if [ "$WANT" = public ]; then
+  ORG_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hook-org-patterns"
+  [ -f "$ORG_HOME" ] || [ -f "$HOOKS/.org-patterns" ] || {
+    echo "  알림: 사내 이름 목록이 없습니다. 만들면 그 이름들도 차단합니다:"
+    echo "        $ORG_HOME   (한 줄에 정규식 하나)"
+  }
+fi
 echo "  해제:   rm $HOOKS/pre-commit $HOOKS/commit-msg $HOOKS/.profile"

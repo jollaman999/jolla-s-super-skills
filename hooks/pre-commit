@@ -82,16 +82,39 @@ check "개인키" \
   'BEGIN [A-Z ]*PRIVATE KEY' \
   "키 파일은 커밋하지 않습니다"
 
+# 사내 조직·제품명은 **소스에 적지 않는다.**
+# 차단하려는 이름을 차단하는 코드에 박아 두면, 이 훅이 공개 repo 에 올라가는 순간
+# 그 이름이 같이 나간다. 그래서 목록은 커밋되지 않는 곳에서 읽는다.
+#
+#   1) HOOK_ORG_PATTERNS      파일 경로 (테스트·CI 용)
+#   2) $GITDIR/hooks/.org-patterns   이 repo 전용. .git 안이라 커밋되지 않는다
+#   3) ~/.claude/hook-org-patterns   전 repo 공통
+#
+# 형식: 한 줄에 정규식 하나. '#' 로 시작하는 줄과 빈 줄은 무시한다.
+#   innogrid
+#   (^|[^-])o11y-manager        <- 부분 문자열 오탐을 막으려면 직접 경계를 준다
 if [ "$PROFILE" = public ]; then
-check "사내 도메인/조직명" \
-  '(innogrid|tabcloudit|jollaman999@|ish@)' \
-  "일반 예시 이름으로 바꾸세요"
+  ORG_FILES=()
+  [ -n "${HOOK_ORG_PATTERNS:-}" ] && ORG_FILES+=("$HOOK_ORG_PATTERNS")
+  [ -f "$GITDIR/hooks/.org-patterns" ] && ORG_FILES+=("$GITDIR/hooks/.org-patterns")
+  ORG_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hook-org-patterns"
+  [ -f "$ORG_HOME" ] && ORG_FILES+=("$ORG_HOME")
 
-# 제품명은 부분 문자열 오탐이 난다. mc-o11y-manager 는 공개 모듈 이름이지 사내 제품이 아니다.
-# 앞에 하이픈이 붙으면 다른 이름으로 보고 넘긴다.
-check "사내 제품명" \
-  '(^|[^-])(o11y-manager|o11y-infra)' \
-  "mc- 가 붙은 공개 모듈명이면 그대로 두고, 사내 제품을 가리키면 일반 이름으로 바꾸세요"
+  ORG_RE=""
+  if [ ${#ORG_FILES[@]} -gt 0 ]; then
+    ORG_RE=$(cat "${ORG_FILES[@]}" 2>/dev/null \
+             | sed 's/[[:space:]]*$//' \
+             | grep -vE '^[[:space:]]*(#|$)' \
+             | paste -sd '|' -)
+  fi
+
+  if [ -n "$ORG_RE" ]; then
+    check "사내 조직·제품명" "($ORG_RE)" \
+      "일반 예시 이름으로 바꾸세요. 공개 모듈명이면 목록의 경계 조건을 손보세요"
+  else
+    # 조용히 건너뛰지 않는다. 검사가 안 도는 것을 통과로 읽으면 그게 무음 실패다.
+    echo "  (알림: 사내 이름 목록이 없어 그 검사는 건너뜁니다 -> $ORG_HOME)"
+  fi
 fi
 
 # 사설/공인 IP - 문서용 대역은 허용. public 프로필만.
