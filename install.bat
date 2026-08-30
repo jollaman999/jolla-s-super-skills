@@ -1,18 +1,22 @@
 @echo off
-rem  cmd 나 탐색기에서 실행했을 때 install.sh 를 Git Bash 로 넘긴다.
-rem  이 파일은 bash 를 찾아 위임하는 것만 한다. 설치 로직은 전부 install.sh 에 있다.
-rem  Cygwin 과 WSL 의 bash 는 일부러 거른다 - 이 repo 의 지원 대상은 Git Bash 다.
+rem  Hands install.sh over to Git Bash when started from cmd or Explorer.
+rem  This file only locates bash and delegates. All install logic is in install.sh.
+rem  Cygwin and WSL bash are skipped on purpose - this repo targets Git Bash.
+rem
+rem  ASCII only, and it has to stay that way. cmd loses track of its file offset
+rem  when a batch file carries non-ASCII text under a switched code page, and ends
+rem  up running a later line from the middle. Korean text goes in install.sh.
 
-rem  한글 메시지가 깨지지 않게 콘솔 코드페이지를 UTF-8 로 바꾼다.
-rem  끝나고 되돌리면 그 순간 콘솔 버퍼가 지워져 방금 낸 안내가 통째로 사라진다. 그래서 되돌리지 않는다.
+rem  Switch the console to UTF-8 so the Korean output of install.sh survives.
+rem  Do not switch back at the end - that clears the console buffer and wipes out
+rem  the notices just printed. Only this one window changes, and closing it resets.
 chcp 65001 >nul
 setlocal
 
-rem  탐색기에서 더블클릭하면 cmd /c 로 뜨고 끝나는 순간 창이 닫힌다.
-rem  그러면 아래 안내를 읽을 시간이 없으므로 그때만 마지막에 멈춘다.
-rem  find 로 판별하지 않는다. PATH 에 Cygwin 이나 Git 의 usr\bin 이 System32 보다 앞서면
-rem  Windows 의 find.exe 가 아니라 GNU find 가 잡혀 /i 를 파일 이름으로 읽고 항상 실패한다.
-rem  외부 명령 없이 배치 문자열 치환으로만 본다.
+rem  An Explorer double-click runs this through cmd /c and the window closes the
+rem  moment it ends, so the notices below would flash past. Pause only in that case.
+rem  Do not use find here: if Cygwin or Git usr\bin comes before System32 on PATH,
+rem  GNU find is picked instead of find.exe, reads /i as a file name, and always fails.
 setlocal enabledelayedexpansion
 set "CL=!cmdcmdline!"
 set CL=!CL:"=!
@@ -22,40 +26,42 @@ endlocal & set "FROMEXPLORER=%FE%"
 
 set "SH=%~dp0install.sh"
 if not exist "%SH%" (
-  echo install.sh 를 찾을 수 없습니다: "%SH%"
+  echo install.sh not found: "%SH%"
   if defined FROMEXPLORER pause
   exit /b 2
 )
 
 set "BASH="
 
-rem  1) Claude Code 가 쓰는 것과 같은 변수를 먼저 본다
+rem  1) the same variable Claude Code uses
 if defined CLAUDE_CODE_GIT_BASH_PATH if exist "%CLAUDE_CODE_GIT_BASH_PATH%" set "BASH=%CLAUDE_CODE_GIT_BASH_PATH%"
 
-rem  2) 정식 설치 위치
+rem  2) standard install locations
 if not defined BASH if exist "%ProgramFiles%\Git\bin\bash.exe" set "BASH=%ProgramFiles%\Git\bin\bash.exe"
 if not defined BASH if exist "%ProgramFiles(x86)%\Git\bin\bash.exe" set "BASH=%ProgramFiles(x86)%\Git\bin\bash.exe"
 if not defined BASH if exist "%LocalAppData%\Programs\Git\bin\bash.exe" set "BASH=%LocalAppData%\Programs\Git\bin\bash.exe"
 
-rem  3) 레지스트리에 적힌 설치 경로
+rem  3) the install path recorded in the registry
 if not defined BASH call :fromreg HKLM
 if not defined BASH call :fromreg HKCU
 
 if not defined BASH (
   echo.
-  echo Git Bash 를 찾지 못했습니다.
+  echo Git Bash not found.
   echo.
-  echo 이 repo 는 전부 bash 스크립트라 Git for Windows 가 있어야 동작합니다.
+  echo Every script in this repo is bash, so Git for Windows is required.
   echo   https://git-scm.com/downloads/win
   echo.
-  echo 설치했는데도 이 메시지가 나오면 경로를 직접 지정하고 다시 실행하세요.
+  echo If it is already installed and you still see this, set the path and retry.
   echo   set "CLAUDE_CODE_GIT_BASH_PATH=C:\Program Files\Git\bin\bash.exe"
+  echo.
+  echo See the Windows section of README.md for the guide in Korean.
   echo.
   if defined FROMEXPLORER pause
   exit /b 1
 )
 
-rem  bash 에 넘길 때는 역슬래시를 슬래시로 바꾼다. 역슬래시는 bash 가 이스케이프로 읽는다.
+rem  Backslashes become slashes on the way to bash - bash reads them as escapes.
 set "SHU=%SH:\=/%"
 echo bash: "%BASH%"
 "%BASH%" "%SHU%" %*
