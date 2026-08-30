@@ -292,8 +292,9 @@ link_failed_notice() {
   say "심볼릭 링크를 만들 수 없습니다: $DEST"
   if is_windows; then
     say "  Windows 에서 심볼릭 링크를 만들려면 개발자 모드 또는 관리자 권한이 필요합니다."
-    say "  설정 > 개인 정보 및 보안 > 개발자용 > 개발자 모드 를 켜고"
-    say "  Git Bash 를 다시 연 뒤 이 스크립트를 다시 실행하면 링크로 설치됩니다."
+    say "  Win+R 에 ms-settings:developers 를 입력하면 설정 페이지가 바로 열립니다."
+    say "  (Windows 11 25H2 부터는 설정 > 시스템 > 고급 아래, 그 전 버전은 개발자용 페이지에 있습니다.)"
+    say "  개발자 모드를 켜고 Git Bash 를 다시 연 뒤 이 스크립트를 다시 실행하면 링크로 설치됩니다."
   else
     say "  파일 시스템이 심볼릭 링크를 지원하지 않는 것 같습니다."
   fi
