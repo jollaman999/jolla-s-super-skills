@@ -10,8 +10,15 @@ setlocal
 
 rem  탐색기에서 더블클릭하면 cmd /c 로 뜨고 끝나는 순간 창이 닫힌다.
 rem  그러면 아래 안내를 읽을 시간이 없으므로 그때만 마지막에 멈춘다.
-set "FROMEXPLORER="
-echo %cmdcmdline% | find /i "%~0" >nul 2>&1 && set "FROMEXPLORER=1"
+rem  find 로 판별하지 않는다. PATH 에 Cygwin 이나 Git 의 usr\bin 이 System32 보다 앞서면
+rem  Windows 의 find.exe 가 아니라 GNU find 가 잡혀 /i 를 파일 이름으로 읽고 항상 실패한다.
+rem  외부 명령 없이 배치 문자열 치환으로만 본다.
+setlocal enabledelayedexpansion
+set "CL=!cmdcmdline!"
+set CL=!CL:"=!
+set "FE="
+if not "!CL:/c =!"=="!CL!" set "FE=1"
+endlocal & set "FROMEXPLORER=%FE%"
 
 set "SH=%~dp0install.sh"
 if not exist "%SH%" (
