@@ -3,7 +3,7 @@
 # 시험 대상: 금지명령 판별(cmd_regex), 샌드박스 탈출 판별(outside_sandbox),
 #            기록에서 고친 파일 뽑기(edited_paths)
 #
-# usage: evals/test-matcher.sh
+# usage: verify-impl/evals/test-matcher.sh
 # exit: 0=전부 통과  1=실패 있음
 set -uo pipefail
 

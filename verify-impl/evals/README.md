@@ -21,11 +21,11 @@
 ## 쓰는 법
 
 ```sh
-evals/run.sh                 # 전부
-evals/run.sh E2              # 하나만
-evals/run.sh E2 --keep       # 기록 파일을 안 지운다. 왜 실패했는지 직접 볼 때
-evals/run.sh --model claude-opus-5   # 모델 고정. 비교할 때는 고정해야 한다
-evals/test-matcher.sh        # 명령 판별기만 시험. 세션을 안 띄워서 즉시 끝난다
+verify-impl/evals/run.sh                 # 전부
+verify-impl/evals/run.sh E2              # 하나만
+verify-impl/evals/run.sh E2 --keep       # 기록 파일을 안 지운다. 왜 실패했는지 직접 볼 때
+verify-impl/evals/run.sh --model claude-opus-5   # 모델 고정. 비교할 때는 고정해야 한다
+verify-impl/evals/test-matcher.sh        # 명령 판별기만 시험. 세션을 안 띄워서 즉시 끝난다
 ```
 
 세션 하나에 1~3분 걸립니다. 케이스가 늘면 그만큼 곱하기입니다.
@@ -91,9 +91,9 @@ skill 은 링크로 걸려서, 시험용 세션이 `~/.claude/skills/verify-impl
 skill 은 링크로 걸리므로, 이 repo 의 파일을 고치면 다음 실행에 바로 반영됩니다.
 
 ```sh
-evals/run.sh --model claude-opus-5           # 고치기 전 통과 개수
+verify-impl/evals/run.sh --model claude-opus-5           # 고치기 전 통과 개수
 # CLAUDE.md 나 SKILL.md 를 고친다
-evals/run.sh --model claude-opus-5           # 고친 뒤 통과 개수
+verify-impl/evals/run.sh --model claude-opus-5           # 고친 뒤 통과 개수
 ```
 
 **한 번 돌린 결과로 판단하지 않습니다.** 같은 입력에도 세션마다 다르게 행동합니다.
@@ -101,7 +101,7 @@ evals/run.sh --model claude-opus-5           # 고친 뒤 통과 개수
 
 ## 지금 있는 케이스
 
-`verify-impl/evals/cases.md` 의 33개 중 아래를 옮겨 놓았습니다.
+옆에 있는 `cases.md` 의 59개 중 아래를 옮겨 놓았습니다.
 
 | 케이스 | 확인하는 것 |
 |--------|-------------|

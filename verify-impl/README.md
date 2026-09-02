@@ -115,7 +115,10 @@ GPU 텔레메트리가 0건인 게 정상인데, 코드만 봐서는 알 수 없
 | `references/` | 판정 기준, SSH 레시피, 경계 조건, 무음 실패 패턴, 내가 틀렸던 방식 |
 | `templates/` | 체크리스트·보고서·접속 대상 양식 |
 | `scripts/` | 아래 참조 |
-| `evals/cases.md` | 평가 케이스와 스크립트 회귀 |
+| `evals/cases.md` | 평가 케이스 목록 |
+| `evals/run.sh` | 세션을 실제로 띄워 규칙을 지키는지 확인합니다 |
+| `evals/test-scripts.sh` | 스크립트 종료 코드와 마스킹 회귀. 세션 없이 몇 초 |
+| `evals/test-matcher.sh` | 판별기 자체 시험. 세션 없이 즉시 |
 
 ### scripts
 

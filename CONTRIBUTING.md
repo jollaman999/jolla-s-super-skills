@@ -27,8 +27,8 @@ scripts/ssh-run.sh VF-01 '...'                             # 안 됩니다
 ## 문서를 고친 뒤
 
 - 스크립트를 고쳤으면 `bash -n <파일>` 로 문법을 봅니다.
-- 규칙(`CLAUDE.md`, `SKILL.md`)을 고쳤으면 `evals/run.sh` 로 회귀를 봅니다. 세션을 실제로 띄워서
-  규칙을 지키는지 확인합니다. 케이스 목록과 쓰는 법은 `evals/README.md` 에 있습니다.
+- 규칙(`CLAUDE.md`, `SKILL.md`)을 고쳤으면 `verify-impl/evals/run.sh` 로 회귀를 봅니다. 세션을 실제로 띄워서
+  규칙을 지키는지 확인합니다. 케이스 목록과 쓰는 법은 `verify-impl/evals/README.md` 에 있습니다.
 - 제목에 개수를 적지 않습니다 (`네 가지`, `5필드`). 항목이 늘면 어긋납니다.
 - 커밋 전에 `./install.sh --check` 로 이 환경에서 실행되는지 봅니다.
 - 커밋 메시지 규칙과 표기 규칙은 커밋 훅이 검사합니다 (`hooks/README.md`)

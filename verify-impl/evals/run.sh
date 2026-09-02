@@ -4,7 +4,7 @@
 # 케이스마다 임시 폴더를 만들고 이 repo 를 그 안에 설치한 뒤,
 # claude -p 로 세션을 한 번 돌리고 무슨 도구를 썼는지 기록에서 확인한다.
 #
-# usage: evals/run.sh [케이스 ...] [--keep] [--model M] [--turns N] [--timeout S]
+# usage: verify-impl/evals/run.sh [케이스 ...] [--keep] [--model M] [--turns N] [--timeout S]
 #   케이스     : 이름만 준다 (E1 E2). 안 주면 cases/ 안의 전부
 #   --keep     : 임시 폴더를 안 지운다. 기록을 직접 볼 때
 #   --model    : 모델을 고정한다. 안 주면 설정된 기본값
@@ -14,8 +14,9 @@
 # exit: 0=전부 통과  1=실패 있음  2=사용법 오류
 set -uo pipefail
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-CASEDIR="$REPO/evals/cases"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+REPO="$(cd "$HERE/../.." && pwd -P)"
+CASEDIR="$HERE/cases"
 
 KEEP=0; MODEL=""; TURNS=8; LIMIT=420; WANT=()
 
