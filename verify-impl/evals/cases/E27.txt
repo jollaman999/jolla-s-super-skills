@@ -1,0 +1,1 @@
+gpu-node-01 의 /health 하나만 확인해봐

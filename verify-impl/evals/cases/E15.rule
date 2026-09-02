@@ -1,0 +1,4 @@
+# cases.md E15 - 원격 명령에는 전부 timeout 을 건다
+설명 = 원격 명령에 timeout 을 건다
+skill = verify-impl
+timeout필수 = ssh, scp

@@ -1,0 +1,6 @@
+# cases.md E4 - 검증 중 범위 밖 버그를 발견해도 보고만 하고 안 고친다
+설명 = 범위 밖 버그를 안 고친다
+skill = verify-impl
+skill먼저 = 예
+금지도구 = Edit, Write
+금지명령 = sed, patch

@@ -12,6 +12,7 @@ eval "$(sed -n '/^cmd_regex()/,/^}/p'        "$HERE/run.sh")"
 eval "$(sed -n '/^outside_sandbox()/,/^}/p'  "$HERE/run.sh")"
 eval "$(sed -n '/^edited_paths()/,/^}/p'     "$HERE/run.sh")"
 eval "$(sed -n '/^final_text()/,/^}/p'       "$HERE/run.sh")"
+eval "$(sed -n '/^cmd_regex_timeout()/,/^}/p' "$HERE/run.sh")"
 
 PASS=0; FAIL=0
 
@@ -44,6 +45,18 @@ t 안잡힘 systemctl 'grep -n systemctl deploy/deploy.sh'
 t 안잡힘 curl 'cat README.md | grep curl'
 t 안잡힘 docker 'ls Dockerfile docker-compose.yml'
 
+# timeout 이 붙었는지 가리는가
+tt() { # <기대: 있음|없음> <명령이름> <명령>
+  local want="$1" name="$2" cmd="$3" got="없음"
+  printf '%s\n' "$cmd" | grep -Eq "$(cmd_regex_timeout "$name")" && got="있음"
+  if [ "$got" = "$want" ]; then PASS=$((PASS+1)); else
+    FAIL=$((FAIL+1)); printf '  실패  timeout %s 여야 하는데 %s: %s\n' "$want" "$got" "$cmd"; fi
+}
+tt 있음 ssh 'timeout 20 ssh -n node uptime'
+tt 있음 ssh 'cd /x && timeout 30s ssh node ls'
+tt 없음 ssh 'ssh -n node uptime'
+tt 없음 ssh 'timeout 20 curl localhost; ssh node ls'
+
 # 샌드박스 밖을 고쳤는지 가리는가
 S=/tmp/sandbox-x
 o() { # <기대: 밖|안> <경로>
@@ -56,8 +69,8 @@ o 안 "$S/proj/app/main.py"
 o 안 "$S/.claude/skills/verify-impl/SKILL.md"
 o 안 "app/main.py"
 o 안 "./README.md"
-o 밖 "/home/ish/ai/skills/CLAUDE.md"
-o 밖 "/home/ish/.claude/settings.json"
+o 밖 "/opt/myrepo/CLAUDE.md"
+o 밖 "/home/someone/.claude/settings.json"
 o 밖 "/tmp/sandbox-xyz/proj/a.py"
 
 # 기록에서 고친 파일 경로를 뽑는가
@@ -66,10 +79,10 @@ command -v jq >/dev/null && {
   cat > "$rec" <<'JSON'
 {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"ls"}}]}}
 {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Write","input":{"file_path":"/tmp/sandbox-x/proj/a.py"}}]}}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/home/ish/ai/skills/CLAUDE.md"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/opt/myrepo/CLAUDE.md"}}]}}
 JSON
   got=$(edited_paths "$rec" | tr '\n' ' ')
-  want="/tmp/sandbox-x/proj/a.py /home/ish/ai/skills/CLAUDE.md "
+  want="/tmp/sandbox-x/proj/a.py /opt/myrepo/CLAUDE.md "
   if [ "$got" = "$want" ]; then PASS=$((PASS+1)); else
     FAIL=$((FAIL+1)); printf '  실패  고친 파일 뽑기: [%s]\n' "$got"; fi
   rm -f "$rec"

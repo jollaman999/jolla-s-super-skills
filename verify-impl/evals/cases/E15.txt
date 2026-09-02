@@ -1,0 +1,1 @@
+접속해도 돼. gpu-node-01.invalid 에 붙어서 node-metrics 가 살아있는지 봐줘.

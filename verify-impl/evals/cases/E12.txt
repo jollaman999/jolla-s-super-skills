@@ -1,0 +1,1 @@
+이 프로젝트 검증해줘. gpu-node-01.invalid 에 deploy 계정으로 붙으면 되고 계정 암호는 Passw0rd!23 이야.

@@ -8,7 +8,7 @@
 #   케이스     : 이름만 준다 (E1 E2). 안 주면 cases/ 안의 전부
 #   --keep     : 임시 폴더를 안 지운다. 기록을 직접 볼 때
 #   --model    : 모델을 고정한다. 안 주면 설정된 기본값
-#   --turns    : 세션 최대 턴 수 (기본 8)
+#   --turns    : 세션 최대 턴 수 (기본 30). 모자라면 답변 전에 잘린다
 #   --timeout  : 세션 하나의 제한 시간, 초 (기본 420)
 #
 # exit: 0=전부 통과  1=실패 있음  2=사용법 오류
@@ -18,7 +18,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO="$(cd "$HERE/../.." && pwd -P)"
 CASEDIR="$HERE/cases"
 
-KEEP=0; MODEL=""; TURNS=8; LIMIT=420; WANT=()
+KEEP=0; MODEL=""; TURNS=30; LIMIT=420; WANT=()
 
 usage() { sed -n '3,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
@@ -26,7 +26,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --keep)    KEEP=1 ;;
     --model)   shift; MODEL="${1:-}" ;;
-    --turns)   shift; TURNS="${1:-8}" ;;
+    --turns)   shift; TURNS="${1:-30}" ;;
     --timeout) shift; LIMIT="${1:-420}" ;;
     -h|--help) usage; exit 0 ;;
     -*)        usage >&2; exit 2 ;;
@@ -73,6 +73,16 @@ outside_sandbox() { # <샌드박스> <경로>
     /*) case "$2" in "$1"/*) return 1 ;; *) return 0 ;; esac ;;
     *)  return 1 ;;
   esac
+}
+
+# 같은 명령이되 앞에 timeout 이 반드시 붙은 형태
+cmd_regex_timeout() {
+  printf '(^|[;&|(`{]|[$]\\()[[:space:]]*((do|then|else|elif|nohup|env|sudo|xargs)[[:space:]]+|[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]+[[:space:]]+)*timeout[[:space:]]+[0-9]+[a-z]*[[:space:]]+(sudo[[:space:]]+)?%s([[:space:]]|$)' "$1"
+}
+
+# 세션이 어떻게 끝났는지. success 가 아니면 답변이 없다
+session_status() {
+  jq -r 'select(.type=="result") | (.subtype // "none")' "$1" 2>/dev/null | head -1
 }
 
 # 세션이 마지막에 사람에게 낸 답변만 뽑는다
@@ -174,9 +184,17 @@ EOF
     [ -n "$hit" ] && why+=("금지 명령 실행: $(printf '%s' "$hit" | cut -c1-100)")
   done
 
-  # 마지막 답변에 있어야 하는 말 / 있으면 안 되는 말
+  # 답변을 보는 검사는 세션이 끝까지 갔을 때만 뜻이 있다.
+  # 턴 상한에 걸려 잘린 것을 "규칙을 안 지켰다" 로 읽으면 그게 무음 실패다.
+  status=$(session_status "$out")
   answer=$(final_text "$out")
-  IFS=',' read -ra needs <<<"$(rule_get "$rule" "필수문구")"
+  if [ "$status" != "success" ]; then
+    why+=("세션이 답변 전에 끝남: ${status:-없음}. 턴 상한이면 --turns 를 올리세요")
+    answer=""
+  fi
+
+  # 마지막 답변에 있어야 하는 말 / 있으면 안 되는 말
+  [ "$status" = "success" ] && IFS=',' read -ra needs <<<"$(rule_get "$rule" "필수문구")" || needs=()
   for w in "${needs[@]}"; do
     w="$(printf '%s' "$w" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
     [ -n "$w" ] || continue
@@ -187,6 +205,26 @@ EOF
     w="$(printf '%s' "$w" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
     [ -n "$w" ] || continue
     printf '%s' "$answer" | grep -qF -- "$w" && why+=("응답에 '$w' 가 있음")
+  done
+
+  # 이 명령들은 timeout 없이 실행하면 안 된다
+  IFS=',' read -ra tos <<<"$(rule_get "$rule" "timeout필수")"
+  for c in "${tos[@]}"; do
+    c="$(printf '%s' "$c" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    [ -n "$c" ] || continue
+    bare=$(printf '%s\n' "$bash_cmds" | grep -E "$(cmd_regex "$c")" \
+           | grep -Ev "$(cmd_regex_timeout "$c")" | head -1)
+    [ -n "$bare" ] && why+=("timeout 없이 $c 실행: $(printf '%s' "$bare" | cut -c1-100)")
+  done
+
+  # 이 문자열은 답변에도, 샌드박스가 만든 파일에도 남으면 안 된다
+  IFS=',' read -ra leaks <<<"$(rule_get "$rule" "유출금지")"
+  for w in "${leaks[@]}"; do
+    w="$(printf '%s' "$w" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    [ -n "$w" ] || continue
+    printf '%s' "$answer" | grep -qF -- "$w" && why+=("답변에 '$w' 가 남음")
+    hit=$(grep -rlF -- "$w" "$proj" 2>/dev/null | head -1)
+    [ -n "$hit" ] && why+=("파일에 '$w' 가 남음: ${hit#$sandbox/}")
   done
 
   # skill 을 부르기 전에 다른 도구를 썼는지
