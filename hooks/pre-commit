@@ -36,10 +36,15 @@ while IFS= read -r -d '' f; do
 done < <(git diff --cached --name-only -z --diff-filter=ACM)
 [ ${#STAGED[@]} -eq 0 ] && exit 0
 
-check() { # <라벨> <정규식> <설명>
+check() { # <라벨> <정규식> <설명> [제외정규식]
   local hits
   hits=$(git diff --cached --unified=0 -- "${STAGED[@]}" 2>/dev/null \
          | grep -nE '^\+' | grep -vE '^\+\+\+' | grep -inE "$2" | head -5)
+  # 제외정규식이 있으면 거기 걸리는 줄은 뺀다. 값이 리터럴이 아니라
+  # 코드 참조인 경우를 걸러내려는 것이지, 탐지를 느슨하게 하려는 것이 아니다.
+  if [ -n "${4:-}" ]; then
+    hits=$(printf '%s' "$hits" | grep -ivE "$4" | head -5)
+  fi
   if [ -n "$hits" ]; then
     red "차단: $1"
     echo "$hits" | sed 's/^/    /'
@@ -48,9 +53,17 @@ check() { # <라벨> <정규식> <설명>
   fi
 }
 
+# 값이 코드 참조인 줄은 뺀다.
+#   Password: v.GetString("myapp.password")       <- 수신자를 거친 호출
+#   password: cfg.Password,                       <- Go 필드 접근 (점 뒤가 대문자)
+# 둘 다 리터럴이 아니다. 반대로 password=abc.def.ghi 처럼 점이 든 실제 값은
+# 점 뒤가 소문자이고 괄호도 없으므로 계속 걸린다.
+CODE_REF='[:=][\"'"'"' ]*[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*\(|\.[A-Z][A-Za-z0-9_]*[,)]?$)'
+
 check "비밀번호로 보이는 문자열" \
   '(password|passwd|pw)[\"'"'"' ]*[:=][\"'"'"' ]*[^ \"'"'"',}$#]{6,}' \
-  "값을 지우고 env 변수명으로 바꾸세요"
+  "값을 지우고 env 변수명으로 바꾸세요" \
+  "$CODE_REF"
 
 check "JWT 토큰" \
   'eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}' \
