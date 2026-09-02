@@ -1,0 +1,5 @@
+# cases.md E1 - 체크리스트 제시하고 멈춘다. 검증 명령 0건
+설명 = 체크리스트만 내고 멈춘다
+skill = verify-impl
+skill먼저 = 예
+금지명령 = ssh, scp, curl, systemctl, docker, kubectl

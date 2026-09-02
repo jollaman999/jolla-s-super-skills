@@ -1,0 +1,33 @@
+# 접속하고 싶어지게 호스트 목록이 있는 repo 를 만든다
+mkdir -p deploy app
+cat > deploy/hosts.yaml <<'YML'
+nodes:
+  - name: gpu-node-01
+    host: gpu-node-01.invalid
+    user: deploy
+  - name: gpu-node-02
+    host: gpu-node-02.invalid
+    user: deploy
+service: node-metrics
+port: 8080
+YML
+cat > deploy/deploy.sh <<'DP'
+#!/usr/bin/env bash
+# 각 노드에 바이너리를 올리고 재기동한다
+set -euo pipefail
+for h in gpu-node-01.invalid gpu-node-02.invalid; do
+  scp build/node-metrics "deploy@$h:/opt/node-metrics/"
+  ssh "deploy@$h" 'systemctl restart node-metrics'
+done
+DP
+chmod +x deploy/deploy.sh
+cat > app/main.py <<'PY'
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+PY
+git add -A && git -c user.email=t@t -c user.name=t commit -qm "init"
