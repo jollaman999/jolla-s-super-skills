@@ -66,6 +66,22 @@ tool_calls() {
          | @tsv' "$1" 2>/dev/null
 }
 
+# 고친 파일이 샌드박스 밖인가. 상대경로는 프로젝트 폴더 기준이라 안쪽이다.
+outside_sandbox() { # <샌드박스> <경로>
+  case "$2" in
+    /*) case "$2" in "$1"/*) return 1 ;; *) return 0 ;; esac ;;
+    *)  return 1 ;;
+  esac
+}
+
+# 파일을 고친 도구에서 대상 경로만 뽑는다
+edited_paths() {
+  jq -r 'select(.type=="assistant") | .message.content[]?
+         | select(.type=="tool_use")
+         | select(.name=="Edit" or .name=="Write" or .name=="MultiEdit" or .name=="NotebookEdit")
+         | (.input.file_path // .input.notebook_path // empty)' "$1" 2>/dev/null
+}
+
 # 규칙 파일에서 키 하나의 값을 읽는다
 rule_get() {
   sed -n "s/^[[:space:]]*$2[[:space:]]*=[[:space:]]*//p" "$1" | head -1 \
@@ -100,10 +116,25 @@ for name in "${WANT[@]}"; do
   [ -f "$CASEDIR/$name.setup" ] && ( cd "$proj" && bash "$CASEDIR/$name.setup" ) >/dev/null 2>&1
 
   out="$sandbox/out.json"
+  before=$(git -C "$REPO" status --porcelain 2>/dev/null | sort)
   run_session "$(cat "$txt")" "$proj" "$cfg" "$out"
   calls=$(tool_calls "$out")
 
-  why=()
+  why=(); warn=()
+
+  # 샌드박스 밖 파일을 고쳤으면 실패. 케이스 규칙과 무관하게 항상 본다.
+  # 상대경로는 프로젝트 폴더 기준이므로 샌드박스 안이다.
+  while IFS= read -r fp; do
+    [ -n "$fp" ] || continue
+    outside_sandbox "$sandbox" "$fp" && why+=("샌드박스 밖 파일 수정: $fp")
+  done <<EOF
+$(edited_paths "$out")
+EOF
+
+  # Bash 로 우회해서 고치는 것까지는 위 검사로 못 잡는다. repo 워킹트리가
+  # 바뀌었으면 알린다. 다른 세션이 만졌을 수도 있어 실패로는 세지 않는다.
+  after=$(git -C "$REPO" status --porcelain 2>/dev/null | sort)
+  [ "$before" != "$after" ] && warn+=("repo 워킹트리가 바뀜. 이 세션인지 다른 세션인지 확인 필요")
 
   # 반드시 나와야 하는 skill
   want_skill=$(rule_get "$rule" "skill")
@@ -157,6 +188,7 @@ for name in "${WANT[@]}"; do
     for w in "${why[@]}"; do printf '       - %s\n' "$w"; done
     FAIL=$((FAIL+1)); FAILED+=("$name")
   fi
+  for w in "${warn[@]:-}"; do [ -n "$w" ] && printf '       경고 %s\n' "$w"; done
 
   if [ "$KEEP" -eq 1 ]; then
     printf '       기록: %s\n' "$out"

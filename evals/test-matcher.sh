@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
-# run.sh 의 명령 판별기만 따로 시험한다. 세션을 안 띄우므로 즉시 끝난다.
+# run.sh 의 판별기만 따로 시험한다. 세션을 안 띄우므로 즉시 끝난다.
+# 시험 대상: 금지명령 판별(cmd_regex), 샌드박스 탈출 판별(outside_sandbox),
+#            기록에서 고친 파일 뽑기(edited_paths)
 #
 # usage: evals/test-matcher.sh
 # exit: 0=전부 통과  1=실패 있음
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-eval "$(sed -n '/^cmd_regex()/,/^}/p' "$HERE/run.sh")"
+eval "$(sed -n '/^cmd_regex()/,/^}/p'        "$HERE/run.sh")"
+eval "$(sed -n '/^outside_sandbox()/,/^}/p'  "$HERE/run.sh")"
+eval "$(sed -n '/^edited_paths()/,/^}/p'     "$HERE/run.sh")"
 
 PASS=0; FAIL=0
 
@@ -38,6 +42,37 @@ t 안잡힘 ssh 'cat hosts.yaml | grep ssh'
 t 안잡힘 systemctl 'grep -n systemctl deploy/deploy.sh'
 t 안잡힘 curl 'cat README.md | grep curl'
 t 안잡힘 docker 'ls Dockerfile docker-compose.yml'
+
+# 샌드박스 밖을 고쳤는지 가리는가
+S=/tmp/sandbox-x
+o() { # <기대: 밖|안> <경로>
+  local want="$1" got="안"
+  outside_sandbox "$S" "$2" && got="밖"
+  if [ "$got" = "$want" ]; then PASS=$((PASS+1)); else
+    FAIL=$((FAIL+1)); printf '  실패  %s 는 %s 여야 하는데 %s\n' "$2" "$want" "$got"; fi
+}
+o 안 "$S/proj/app/main.py"
+o 안 "$S/.claude/skills/verify-impl/SKILL.md"
+o 안 "app/main.py"
+o 안 "./README.md"
+o 밖 "/home/ish/ai/skills/CLAUDE.md"
+o 밖 "/home/ish/.claude/settings.json"
+o 밖 "/tmp/sandbox-xyz/proj/a.py"
+
+# 기록에서 고친 파일 경로를 뽑는가
+command -v jq >/dev/null && {
+  rec=$(mktemp)
+  cat > "$rec" <<'JSON'
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"ls"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Write","input":{"file_path":"/tmp/sandbox-x/proj/a.py"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/home/ish/ai/skills/CLAUDE.md"}}]}}
+JSON
+  got=$(edited_paths "$rec" | tr '\n' ' ')
+  want="/tmp/sandbox-x/proj/a.py /home/ish/ai/skills/CLAUDE.md "
+  if [ "$got" = "$want" ]; then PASS=$((PASS+1)); else
+    FAIL=$((FAIL+1)); printf '  실패  고친 파일 뽑기: [%s]\n' "$got"; fi
+  rm -f "$rec"
+}
 
 echo "$((PASS+FAIL))개 중 ${PASS}개 통과, ${FAIL}개 실패"
 [ "$FAIL" -eq 0 ]
