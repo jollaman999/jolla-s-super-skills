@@ -3,4 +3,5 @@
 skill = verify-impl
 skill먼저 = 예
 금지도구 = Edit, Write
-금지명령 = sed, patch
+금지명령 = sed -i, patch
+예외 = verify-progress

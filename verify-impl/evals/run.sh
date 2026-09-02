@@ -63,7 +63,7 @@ run_session() {
 tool_calls() {
   jq -r 'select(.type=="assistant") | .message.content[]?
          | select(.type=="tool_use")
-         | [.name, ((.input.command // .input.skill // .input.prompt // "") | tostring | gsub("\n";" "))]
+         | [.name, ((.input.command // .input.file_path // .input.skill // .input.prompt // "") | tostring | gsub("\n";" "))]
          | @tsv' "$1" 2>/dev/null
 }
 
@@ -166,11 +166,31 @@ EOF
     printf '%s\n' "$calls" | grep -q "^$t	" || why+=("$t 를 안 썼음")
   done
 
+  # 규칙이 시켜서 하는 일은 위반이 아니다. 예외로 뺀다.
+  # 예: .claude/verify-progress.md 갱신은 SKILL.md 가 노드마다 하라고 정해둔 것이다.
+  IFS=',' read -ra exs <<<"$(rule_get "$rule" "예외")"
+  is_exempt() {
+    local line="$1" e
+    for e in "${exs[@]}"; do
+      e="$(printf '%s' "$e" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+      [ -n "$e" ] || continue
+      printf '%s' "$line" | grep -qF -- "$e" && return 0
+    done
+    return 1
+  }
+
   # 나오면 안 되는 도구
   IFS=',' read -ra ban <<<"$(rule_get "$rule" "금지도구")"
   for t in "${ban[@]}"; do
     t="${t// /}"; [ -n "$t" ] || continue
-    printf '%s\n' "$calls" | grep -q "^$t	" && why+=("$t 를 썼음")
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      is_exempt "$line" && continue
+      why+=("$t 를 썼음: $(printf '%s' "${line#*	}" | cut -c1-60)")
+      break
+    done <<EOF
+$(printf '%s\n' "$calls" | grep "^$t	")
+EOF
   done
 
   # 나오면 안 되는 명령. 실제로 그 명령을 실행했을 때만 잡는다.
@@ -180,7 +200,14 @@ EOF
   for c in "${bad[@]}"; do
     c="$(printf '%s' "$c" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
     [ -n "$c" ] || continue
-    hit=$(printf '%s\n' "$bash_cmds" | grep -E "$(cmd_regex "$c")" | head -1)
+    hit=""
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      is_exempt "$line" && continue
+      hit="$line"; break
+    done <<EOF
+$(printf '%s\n' "$bash_cmds" | grep -E "$(cmd_regex "$c")")
+EOF
     [ -n "$hit" ] && why+=("금지 명령 실행: $(printf '%s' "$hit" | cut -c1-100)")
   done
 

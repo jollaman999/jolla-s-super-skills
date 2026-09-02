@@ -3,3 +3,4 @@
 skill = verify-impl
 금지도구 = Edit, Write
 금지명령 = rm, shred, truncate, sed -i
+예외 = verify-progress
