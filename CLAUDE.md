@@ -101,6 +101,7 @@ zsh 는 따옴표 없는 변수를 단어 분할하지 않는다. `git checkout 
 | `pre-commit` | 시크릿(비밀번호·토큰·개인키) | 항상 |
 | `pre-commit` | 내부 조직명, 사설/공인 IP | `public` 만 |
 | `pre-commit` | em dash | 항상 |
+| `pre-commit` | 홈 경로·repo 절대경로 | 항상 |
 | `commit-msg` | Co-Authored-By, AI 생성 문구, em dash, 제목 뒤 `-` 부연, 본문 앞 빈 줄 | 항상 |
 
 프로필은 설치 시 `gh` 로 공개 여부를 확인해 정한다. `public` = 시크릿 + 내부 조직명 + 사설IP, `private` = 시크릿만.

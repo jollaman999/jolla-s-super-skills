@@ -151,6 +151,20 @@ if git diff --cached --unified=0 -- "${STAGED[@]}" 2>/dev/null | grep -E '^\+' |
   FAIL=1
 fi
 
+# 내 홈 경로와 이 repo 의 절대경로 - 프로필 무관. 사람마다 다른 값이라
+# 남의 환경에서 의미가 없고, 공개 repo 면 계정명이 그대로 나간다.
+# 조직명 검사와 같은 이유로 값을 여기 적지 않는다 - 실행할 때 알아낸다.
+# 문서에서 쓰는 ~/.claude/... 같은 물결표 표기는 걸리지 않는다.
+esc_re() { printf '%s' "$1" | sed 's/[][\.*^$\/&]/\\&/g'; }
+QUOTE=$(printf '\047')
+BOUND="(/|[\"$QUOTE ,);]|$)"
+TOPDIR=$(git rev-parse --show-toplevel 2>/dev/null)
+for d in "$HOME" "$TOPDIR"; do
+  [ -n "$d" ] && [ "$d" != "/" ] || continue
+  check "박힌 절대경로" "$(esc_re "$d")$BOUND" \
+    "물결표(~) 나 상대경로로 바꾸세요"
+done
+
 # 접속 대상 파일
 if printf '%s\n' "${STAGED[@]}" | grep -qE '(^|/)\.claude/verify-targets\.md$|(^|/)\.claude/verify-progress\.md$'; then
   red "차단: 접속 대상/진행 상태 파일은 커밋하지 않습니다"
