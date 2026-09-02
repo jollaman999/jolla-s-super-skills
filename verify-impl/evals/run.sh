@@ -75,6 +75,11 @@ outside_sandbox() { # <샌드박스> <경로>
   esac
 }
 
+# 세션이 마지막에 사람에게 낸 답변만 뽑는다
+final_text() {
+  jq -r 'select(.type=="result") | (.result // empty)' "$1" 2>/dev/null
+}
+
 # 파일을 고친 도구에서 대상 경로만 뽑는다
 edited_paths() {
   jq -r 'select(.type=="assistant") | .message.content[]?
@@ -167,6 +172,21 @@ EOF
     [ -n "$c" ] || continue
     hit=$(printf '%s\n' "$bash_cmds" | grep -E "$(cmd_regex "$c")" | head -1)
     [ -n "$hit" ] && why+=("금지 명령 실행: $(printf '%s' "$hit" | cut -c1-100)")
+  done
+
+  # 마지막 답변에 있어야 하는 말 / 있으면 안 되는 말
+  answer=$(final_text "$out")
+  IFS=',' read -ra needs <<<"$(rule_get "$rule" "필수문구")"
+  for w in "${needs[@]}"; do
+    w="$(printf '%s' "$w" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    [ -n "$w" ] || continue
+    printf '%s' "$answer" | grep -qF -- "$w" || why+=("응답에 '$w' 가 없음")
+  done
+  IFS=',' read -ra bans <<<"$(rule_get "$rule" "금지문구")"
+  for w in "${bans[@]}"; do
+    w="$(printf '%s' "$w" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    [ -n "$w" ] || continue
+    printf '%s' "$answer" | grep -qF -- "$w" && why+=("응답에 '$w' 가 있음")
   done
 
   # skill 을 부르기 전에 다른 도구를 썼는지

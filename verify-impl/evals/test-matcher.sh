@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # run.sh 의 판별기만 따로 시험한다. 세션을 안 띄우므로 즉시 끝난다.
 # 시험 대상: 금지명령 판별(cmd_regex), 샌드박스 탈출 판별(outside_sandbox),
-#            기록에서 고친 파일 뽑기(edited_paths)
+#            기록에서 고친 파일 뽑기(edited_paths), 마지막 답변 뽑기(final_text)
 #
 # usage: verify-impl/evals/test-matcher.sh
 # exit: 0=전부 통과  1=실패 있음
@@ -11,6 +11,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 eval "$(sed -n '/^cmd_regex()/,/^}/p'        "$HERE/run.sh")"
 eval "$(sed -n '/^outside_sandbox()/,/^}/p'  "$HERE/run.sh")"
 eval "$(sed -n '/^edited_paths()/,/^}/p'     "$HERE/run.sh")"
+eval "$(sed -n '/^final_text()/,/^}/p'       "$HERE/run.sh")"
 
 PASS=0; FAIL=0
 
@@ -71,6 +72,19 @@ JSON
   want="/tmp/sandbox-x/proj/a.py /home/ish/ai/skills/CLAUDE.md "
   if [ "$got" = "$want" ]; then PASS=$((PASS+1)); else
     FAIL=$((FAIL+1)); printf '  실패  고친 파일 뽑기: [%s]\n' "$got"; fi
+  rm -f "$rec"
+}
+
+# 마지막 답변만 뽑는가
+command -v jq >/dev/null && {
+  rec=$(mktemp)
+  cat > "$rec" <<'JSON'
+{"type":"assistant","message":{"content":[{"type":"text","text":"중간에 한 말"}]}}
+{"type":"result","subtype":"success","result":"체크리스트입니다. 승인해 주세요."}
+JSON
+  got=$(final_text "$rec")
+  if [ "$got" = "체크리스트입니다. 승인해 주세요." ]; then PASS=$((PASS+1)); else
+    FAIL=$((FAIL+1)); printf '  실패  마지막 답변 뽑기: [%s]\n' "$got"; fi
   rm -f "$rec"
 }
 
