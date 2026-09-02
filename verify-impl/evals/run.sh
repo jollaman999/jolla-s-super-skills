@@ -7,6 +7,7 @@
 # usage: verify-impl/evals/run.sh [케이스 ...] [--keep] [--model M] [--turns N] [--timeout S]
 #   케이스     : 이름만 준다 (E1 E2). 안 주면 cases/ 안의 전부
 #   --keep     : 임시 폴더를 안 지운다. 기록을 직접 볼 때
+#   --reps     : 케이스마다 N 번 돌려 통과 횟수를 센다 (기본 1). 세션은 매번 다르게 행동한다
 #   --model    : 모델을 고정한다. 안 주면 설정된 기본값
 #   --turns    : 세션 최대 턴 수 (기본 30). 모자라면 답변 전에 잘린다
 #   --timeout  : 세션 하나의 제한 시간, 초 (기본 420)
@@ -18,13 +19,14 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO="$(cd "$HERE/../.." && pwd -P)"
 CASEDIR="$HERE/cases"
 
-KEEP=0; MODEL=""; TURNS=30; LIMIT=420; WANT=()
+KEEP=0; MODEL=""; TURNS=30; LIMIT=420; REPS=1; WANT=()
 
 usage() { sed -n '3,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --keep)    KEEP=1 ;;
+    --reps)    shift; REPS="${1:-1}" ;;
     --model)   shift; MODEL="${1:-}" ;;
     --turns)   shift; TURNS="${1:-30}" ;;
     --timeout) shift; LIMIT="${1:-420}" ;;
@@ -112,20 +114,20 @@ cmd_regex() {
   printf '(^|[;&|(`{]|[$]\\()[[:space:]]*((do|then|else|elif|nohup|env|sudo|xargs)[[:space:]]+|[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]+[[:space:]]+|timeout[[:space:]]+[0-9]+[a-z]*[[:space:]]+)*%s([[:space:]]|$)' "$1"
 }
 
-PASS=0; FAIL=0; FAILED=()
-
-for name in "${WANT[@]}"; do
-  txt="$CASEDIR/$name.txt"; rule="$CASEDIR/$name.rule"
-  [ -f "$txt" ]  || { echo "$name  건너뜀 (프롬프트 파일 없음)"; continue; }
-  [ -f "$rule" ] || { echo "$name  건너뜀 (규칙 파일 없음)"; continue; }
-
-  desc=$(rule_get "$rule" "설명")
+# 케이스를 한 번 돌린다. 결과를 접두사로 구분해 표준출력에 낸다.
+#   R:<사유>  실패 사유. 한 줄도 없으면 통과
+#   W:<경고>  실패로는 안 세는 것
+#   K:<경로>  --keep 일 때 남긴 기록 파일
+run_once() { # <케이스이름> <규칙파일> <프롬프트파일>
+  local name="$1" rule="$2" txt="$3"
+  local sandbox cfg proj out before after status answer calls bash_cmds first early hit bare w c t e line
+  local -a why warn needs bans bad ban tos leaks exs need
   sandbox=$(mktemp -d); cfg="$sandbox/.claude"; proj="$sandbox/proj"
   mkdir -p "$cfg" "$proj"
   [ -f "$CREDS" ] && { cp "$CREDS" "$cfg/.credentials.json"; chmod 600 "$cfg/.credentials.json"; }
 
   CLAUDE_CONFIG_DIR="$cfg" "$REPO/install.sh" --global --yes >"$sandbox/install.log" 2>&1 || {
-    echo "$name  실패 (설치 오류, $sandbox/install.log)"; FAIL=$((FAIL+1)); FAILED+=("$name"); continue; }
+    printf 'R:설치 오류 (%s)\n' "$sandbox/install.log"; return; }
 
   # 케이스가 가짜 프로젝트를 요구하면 만들어 둔다
   ( cd "$proj" && git init -q ) 2>/dev/null
@@ -281,9 +283,56 @@ EOF
   else
     rm -rf "$sandbox"
   fi
+
+  local r
+  for r in "${why[@]:-}";  do [ -n "$r" ] && printf 'R:%s\n' "$r"; done
+  for r in "${warn[@]:-}"; do [ -n "$r" ] && printf 'W:%s\n' "$r"; done
+  if [ "$KEEP" -eq 1 ]; then printf 'K:%s\n' "$out"; else rm -rf "$sandbox"; fi
+}
+
+PASS=0; FAIL=0; FAILED=()
+
+for name in "${WANT[@]}"; do
+  txt="$CASEDIR/$name.txt"; rule="$CASEDIR/$name.rule"
+  [ -f "$txt" ]  || { echo "$name  건너뜀 (프롬프트 파일 없음)"; continue; }
+  [ -f "$rule" ] || { echo "$name  건너뜀 (규칙 파일 없음)"; continue; }
+
+  desc=$(rule_get "$rule" "설명")
+  ok=0; reasons=""; warns=""; keeps=""
+  rep=1
+  while [ "$rep" -le "$REPS" ]; do
+    result=$(run_once "$name" "$rule" "$txt")
+    rs=$(printf '%s\n' "$result" | sed -n 's/^R://p')
+    if [ -z "$rs" ]; then ok=$((ok+1)); else reasons="$reasons$rs
+"; fi
+    warns="$warns$(printf '%s\n' "$result" | sed -n 's/^W://p')
+"
+    keeps="$keeps$(printf '%s\n' "$result" | sed -n 's/^K://p')
+"
+    rep=$((rep+1))
+  done
+
+  if [ "$REPS" -eq 1 ]; then
+    [ "$ok" -eq 1 ] && verdict="통과" || verdict="실패"
+  else
+    verdict="$ok/$REPS 통과"
+  fi
+  printf '%-4s %-34s %s\n' "$name" "$desc" "$verdict"
+
+  # 같은 사유가 여러 번 나오면 한 줄로 합친다
+  printf '%s' "$reasons" | grep -v '^$' | sort | uniq -c | sort -rn \
+    | sed 's/^ *\([0-9]*\) /       - (\1회) /'
+  printf '%s' "$warns"   | grep -v '^$' | sort -u | sed 's/^/       경고 /'
+  printf '%s' "$keeps"   | grep -v '^$' | sed 's/^/       기록: /'
+
+  if [ "$ok" -eq "$REPS" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); FAILED+=("$name"); fi
 done
 
 echo
-echo "$((PASS+FAIL))개 중 ${PASS}개 통과, ${FAIL}개 실패"
+if [ "$REPS" -eq 1 ]; then
+  echo "$((PASS+FAIL))개 중 ${PASS}개 통과, ${FAIL}개 실패"
+else
+  echo "$((PASS+FAIL))개 중 ${PASS}개가 ${REPS}회 전부 통과, ${FAIL}개는 한 번이라도 실패"
+fi
 [ "$FAIL" -eq 0 ] || { echo "실패: ${FAILED[*]}"; exit 1; }
 exit 0
