@@ -24,12 +24,21 @@
 verify-impl/evals/run.sh                 # 전부
 verify-impl/evals/run.sh E2              # 하나만
 verify-impl/evals/run.sh E2 --keep       # 통과한 회차의 기록까지 남긴다
-verify-impl/evals/run.sh E2 --reps 5     # 5번 돌려 몇 번 통과하는지 센다
+verify-impl/evals/run.sh E2 --reps 5     # 5번 돌려 몇 번 통과하는지 센다 (안 주면 물어봅니다)
 verify-impl/evals/run.sh --model claude-opus-5   # 모델 고정. 비교할 때는 고정해야 한다
 verify-impl/evals/test-matcher.sh        # 명령 판별기만 시험. 세션을 안 띄워서 즉시 끝난다
 ```
 
-세션 하나에 1~3분 걸립니다. 케이스가 늘면 그만큼 곱하기입니다.
+**`--reps` 를 안 주면 몇 번 돌릴지 물어봅니다.** 세션 하나에 1~3분 걸리고 토큰을 쓰기 때문에
+기본값으로 여러 번 도는 일이 없게 했습니다. 엔터를 치면 1회입니다.
+
+```
+$ verify-impl/evals/run.sh E1 E2
+케이스 2개. 몇 번씩 돌릴까요? (1=빠름, 3~5=흔들리는지 확인) [1]: 3
+세션 6개, 대략 18분 걸립니다. 멈추려면 Ctrl-C.
+```
+
+파이프나 백그라운드처럼 터미널이 아닌 자리에서는 묻지 않고 1회로 갑니다.
 
 **세션이 아예 못 돈 것과 규칙을 어긴 것을 갈라서 냅니다.** 로그인이 풀렸거나 API 오류가
 나면 `돌리지 못함` 으로 찍히고 종료 코드가 2 입니다. 그 회차는 통과·실패 어느 쪽으로도 안 셉니다.

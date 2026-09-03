@@ -7,7 +7,7 @@
 # usage: verify-impl/evals/run.sh [케이스 ...] [--keep] [--model M] [--turns N] [--timeout S]
 #   케이스     : 이름만 준다 (E1 E2). 안 주면 cases/ 안의 전부
 #   --keep     : 임시 폴더를 안 지운다. 기록을 직접 볼 때
-#   --reps     : 케이스마다 N 번 돌려 통과 횟수를 센다 (기본 1). 세션은 매번 다르게 행동한다
+#   --reps     : 케이스마다 N 번 돌린다. 안 주면 물어본다 (터미널이 아니면 1회)
 #   --model    : 모델을 고정한다. 안 주면 설정된 기본값
 #   --turns    : 세션 최대 턴 수 (기본 30). 모자라면 답변 전에 잘린다
 #   --timeout  : 세션 하나의 제한 시간, 초 (기본 420)
@@ -19,14 +19,14 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO="$(cd "$HERE/../.." && pwd -P)"
 CASEDIR="$HERE/cases"
 
-KEEP=0; MODEL=""; TURNS=30; LIMIT=420; REPS=1; WANT=()
+KEEP=0; MODEL=""; TURNS=30; LIMIT=420; REPS=1; REPS_SET=0; WANT=()
 
 usage() { sed -n '3,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --keep)    KEEP=1 ;;
-    --reps)    shift; REPS="${1:-1}" ;;
+    --reps)    shift; REPS="${1:-1}"; REPS_SET=1 ;;
     --model)   shift; MODEL="${1:-}" ;;
     --turns)   shift; TURNS="${1:-30}" ;;
     --timeout) shift; LIMIT="${1:-420}" ;;
@@ -51,6 +51,25 @@ if [ "${#WANT[@]}" -eq 0 ]; then
   done
 fi
 [ "${#WANT[@]}" -gt 0 ] || { echo "케이스가 없습니다: $CASEDIR" >&2; exit 2; }
+
+# 몇 번 돌릴지는 사람이 정한다. 세션 하나에 몇 분씩 걸리고 토큰을 쓰기 때문에
+# 기본값으로 여러 번 도는 일이 없어야 한다.
+# --reps 를 줬으면 묻지 않는다. 터미널이 아니면(파이프·CI·백그라운드) 1회로 간다.
+if [ "$REPS_SET" -eq 0 ]; then
+  if [ -t 0 ]; then
+    printf '케이스 %d개. 몇 번씩 돌릴까요? (1=빠름, 3~5=흔들리는지 확인) [1]: ' "${#WANT[@]}"
+    read -r ans
+    case "$ans" in
+      ''|*[!0-9]*) REPS=1 ;;
+      *)           REPS=$ans ;;
+    esac
+    [ "$REPS" -lt 1 ] && REPS=1
+    printf '세션 %d개, 대략 %d분 걸립니다. 멈추려면 Ctrl-C.\n\n' \
+      "$((${#WANT[@]} * REPS))" "$((${#WANT[@]} * REPS * 3))"
+  else
+    REPS=1
+  fi
+fi
 
 # 프롬프트 파일을 --- 줄로 잘라 메시지 하나씩 NUL 로 구분해 낸다
 split_messages() {
