@@ -171,6 +171,28 @@ if printf '%s\n' "${STAGED[@]}" | grep -qE '(^|/)\.claude/verify-targets\.md$|(^
   FAIL=1
 fi
 
+# 규칙 파일을 고쳤으면 회귀를 돌려볼 것을 알린다. 막지는 않는다.
+# 검증은 세션을 띄우므로 시간과 토큰이 든다. 돌릴지는 사람이 정한다.
+# evals 가 있는 repo(= 이 skills repo)에서만 뜬다.
+if printf '%s\n' "${STAGED[@]}" | grep -qE '(^|/)(CLAUDE\.md|SKILL\.md)$'; then
+  RUNNER="$TOPDIR/verify-impl/evals/run.sh"
+  if [ -x "$RUNNER" ]; then
+    QUICK=""
+    [ -f "$TOPDIR/verify-impl/evals/quick.txt" ] \
+      && QUICK=$(tr -d '\n' < "$TOPDIR/verify-impl/evals/quick.txt")
+    echo
+    echo "[알림] 규칙 파일을 고쳤습니다:"
+    printf '%s\n' "${STAGED[@]}" | grep -E '(^|/)(CLAUDE\.md|SKILL\.md)$' | sed 's/^/         /'
+    if [ -n "$QUICK" ]; then
+      echo "       verify-impl/evals/run.sh $QUICK"
+      echo "       명령·도구로 판정하는 것들입니다. 케이스당 3분쯤 걸립니다."
+    else
+      echo "       verify-impl/evals/README.md 를 보세요."
+    fi
+    echo "       돌릴지는 직접 정하세요. 커밋은 그대로 됩니다."
+  fi
+fi
+
 if [ $FAIL -ne 0 ]; then
   echo
   echo "  (프로필: $PROFILE)"

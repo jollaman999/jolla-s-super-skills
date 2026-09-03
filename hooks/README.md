@@ -63,6 +63,18 @@
 | 홈 경로·repo 절대경로가 박힌 줄 | 항상 |
 | `.claude/verify-targets.md` 등 접속 대상 파일 | 항상 |
 
+**막지 않고 알리기만 하는 것이 하나 있습니다.** `CLAUDE.md` 나 `SKILL.md` 가 스테이지되면
+회귀를 돌려볼 명령을 한 줄 띄우고 커밋은 그대로 진행합니다. 검증은 세션을 실제로 띄우므로
+시간과 토큰이 들어서, 돌릴지는 사람이 정합니다. `verify-impl/evals/run.sh` 가 있는
+repo 에서만 뜨고, 돌릴 케이스 목록은 `verify-impl/evals/quick.txt` 에서 고칩니다.
+
+```
+[알림] 규칙 파일을 고쳤습니다:
+         verify-impl/SKILL.md
+       verify-impl/evals/run.sh E1 E2 E4 E13 E15 E27 E38
+       돌릴지는 직접 정하세요. 커밋은 그대로 됩니다.
+```
+
 절대경로는 `$HOME` 과 `git rev-parse --show-toplevel` 을 실행할 때 읽어서 씁니다. 사람마다 다른 값이라
 훅 안에 적어두면 그 값이 공개 repo 에 그대로 나갑니다. 조직명 목록을 커밋 안 되는 곳에서 읽는 것과 같은 이유입니다.
 문서에서 쓰는 `~/.claude/...` 같은 물결표 표기와 `$(dirname "$0")` 은 걸리지 않습니다.
