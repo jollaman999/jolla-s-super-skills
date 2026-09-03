@@ -129,13 +129,24 @@ session_status() {
   jq -rs 'map(select(.type=="result")) | last | (.subtype // "none")' "$1" 2>/dev/null
 }
 
-# 세션 자체가 실패했는가. 로그인 만료·API 오류·요금 한도가 여기 걸린다.
-# 이런 것은 규칙 위반이 아니라 돌리지 못한 것이다. "Not logged in" 은
-# subtype 이 success 인 채로 오므로 subtype 만 보면 놓친다.
+# 세션 자체가 실패했는가. 규칙 위반이 아니라 돌리지 못한 것들이다.
+#   - 로그인 만료·API 오류: is_error 가 true. "Not logged in" 은 subtype 이
+#     success 인 채로 오므로 subtype 만 보면 놓친다.
+#   - 시간 초과로 중간에 잘림: result 줄 자체가 없다.
+#   - 턴 상한: 답변까지 못 갔다. --turns 를 올릴 일이지 규칙 문제가 아니다.
 session_error() {
-  jq -rs 'map(select(.type=="result" and .is_error == true)) | first
-          | if . == null then empty
-            else ((.subtype // "error") + ": " + ((.result // "") | tostring)) end' "$1" 2>/dev/null
+  local n
+  n=$(grep -c '"type":"result"' "$1" 2>/dev/null) || n=0
+  if [ "${n:-0}" -eq 0 ]; then
+    echo "답변 없이 잘림: --timeout 을 올리세요"
+    return
+  fi
+  jq -rs 'map(select(.type=="result")) as $r
+          | ($r | map(select(.is_error == true)) | first) as $bad
+          | ($r | last) as $lastr
+          | if $bad != null then (($bad.subtype // "error") + ": " + (($bad.result // "") | tostring))
+            elif ($lastr.subtype // "") == "error_max_turns" then "턴 상한: --turns 를 올리세요"
+            else empty end' "$1" 2>/dev/null
 }
 
 # 사람에게 낸 마지막 답변만 뽑는다
@@ -292,7 +303,7 @@ EOF
   status=$(session_status "$out")
   answer=$(final_text "$out")
   if [ "$status" != "success" ]; then
-    why+=("세션이 답변 전에 끝남: ${status:-없음}. 턴 상한이면 --turns 를 올리세요")
+    why+=("세션이 답변 전에 끝남: ${status:-없음}")
     answer=""
   fi
 

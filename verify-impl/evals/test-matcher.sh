@@ -140,8 +140,13 @@ command -v jq >/dev/null && {
   se_is 있음 "중간 턴에서 API 오류" \
     '{"type":"result","subtype":"success","is_error":false,"result":"1턴"}' \
     '{"type":"result","subtype":"error_during_execution","is_error":true,"result":"API error"}'
-  se_is 없음 "턴 상한은 규칙 검사로 넘긴다" \
+  se_is 있음 "턴 상한" \
     '{"type":"result","subtype":"error_max_turns","is_error":false,"result":""}'
+  se_is 있음 "시간 초과로 result 줄 자체가 없음" \
+    '{"type":"assistant","message":{"content":[]}}'
+  se_is 없음 "여러 턴 중 앞턴 정상, 마지막도 정상" \
+    '{"type":"result","subtype":"success","is_error":false,"result":"1턴"}' \
+    '{"type":"result","subtype":"success","is_error":false,"result":"2턴"}'
 }
 
 # --- 로 나눈 발화를 순서대로 내는가
