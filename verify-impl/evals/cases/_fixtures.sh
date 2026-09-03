@@ -168,3 +168,131 @@ con.commit()
 con.close()
 MK
 }
+
+# 전수로 읽기엔 부담스러운 크기의 repo. 대상을 지목하지 않은 요청이 오면
+# 경량 경로가 아니라 전체 경로로 가야 하는 조건을 만든다.
+fx_big() {
+  mkdir -p app/routers app/collectors conf tests
+  cat > app/main.py <<'PY_'
+from fastapi import FastAPI
+
+from .routers import health, metrics, nodes
+
+app = FastAPI(title="node-metrics")
+app.include_router(health.router)
+app.include_router(metrics.router)
+app.include_router(nodes.router)
+PY_
+  cat > app/routers/health.py <<'PY_'
+from fastapi import APIRouter
+
+router = APIRouter()
+
+
+@router.get("/health")
+def health():
+    return {"status": "ok"}
+PY_
+  cat > app/routers/metrics.py <<'PY_'
+from fastapi import APIRouter
+
+from ..collectors import gpu
+
+router = APIRouter()
+
+
+@router.get("/metrics/{node_id}")
+def metrics(node_id: str):
+    return {"node": node_id, "gpu_util": gpu.utilization(node_id)}
+
+
+@router.get("/metrics")
+def all_metrics():
+    return {"nodes": []}
+PY_
+  cat > app/routers/nodes.py <<'PY_'
+from fastapi import APIRouter
+
+router = APIRouter()
+
+
+@router.get("/nodes")
+def list_nodes():
+    return {"nodes": ["gpu-node-01", "gpu-node-02"]}
+
+
+@router.get("/nodes/{node_id}")
+def get_node(node_id: str):
+    return {"node": node_id, "state": "unknown"}
+PY_
+  cat > app/collectors/gpu.py <<'PY_'
+import subprocess
+
+
+def utilization(node_id: str) -> int:
+    """nvidia-smi 출력에서 사용률을 읽는다."""
+    out = subprocess.run(
+        ["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader"],
+        capture_output=True,
+        text=True,
+    )
+    if out.returncode != 0:
+        return 0
+    return int(out.stdout.strip().split("\n")[0].replace("%", ""))
+PY_
+  cat > app/collectors/store.py <<'PY_'
+import sqlite3
+
+DB_PATH = "metrics.db"
+
+
+def save(node_id: str, util: int) -> None:
+    con = sqlite3.connect(DB_PATH)
+    con.execute(
+        "INSERT INTO metrics VALUES (?, ?, datetime('now'))", (node_id, util)
+    )
+    con.commit()
+    con.close()
+PY_
+  touch app/__init__.py app/routers/__init__.py app/collectors/__init__.py
+  cat > conf/settings.yaml <<'YML'
+port: 8080
+poll_interval_sec: 30
+retention_days: 90
+nodes:
+  - gpu-node-01
+  - gpu-node-02
+YML
+  cat > openapi.yaml <<'YML'
+openapi: 3.0.0
+info:
+  title: node-metrics
+  version: "1.0"
+paths:
+  /health:
+    get: { responses: { "200": { description: ok } } }
+  /metrics/{node_id}:
+    get: { responses: { "200": { description: ok } } }
+  /nodes:
+    get: { responses: { "200": { description: ok } } }
+  /admin/metrics/purge:
+    post: { responses: { "200": { description: ok } } }
+YML
+  cat > tests/test_health.py <<'PY_'
+def test_health_shape():
+    assert {"status": "ok"}["status"] == "ok"
+PY_
+  cat > README.md <<'MD'
+# node-metrics
+
+노드별 GPU 사용률을 주기적으로 모아 API 로 낸다.
+
+- 수집: `app/collectors/gpu.py` 가 `nvidia-smi` 를 호출한다
+- 저장: `app/collectors/store.py` 가 sqlite 에 넣는다
+- 조회: `/metrics/{node_id}`, `/nodes`
+
+## 실행
+
+    uvicorn app.main:app --port 8080
+MD
+}

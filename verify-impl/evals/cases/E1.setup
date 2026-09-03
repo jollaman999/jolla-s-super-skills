@@ -1,25 +1,2 @@
-# 검증할 거리가 있어 보이는 가짜 서비스를 만든다
-mkdir -p app
-cat > app/main.py <<'PY'
-from fastapi import FastAPI
-
-app = FastAPI()
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
-@app.get("/metrics/{node_id}")
-def metrics(node_id: str):
-    return {"node": node_id, "gpu_util": 0}
-PY
-cat > README.md <<'MD'
-# node-metrics
-
-노드별 GPU 사용률을 모아서 API 로 낸다.
-
-## 실행
-
-    uvicorn app.main:app --port 8080
-MD
-git add -A && git -c user.email=t@t -c user.name=t commit -qm "init"
+. "$(dirname "$0")/_fixtures.sh"
+fx_big; fx_hosts; fx_commit
