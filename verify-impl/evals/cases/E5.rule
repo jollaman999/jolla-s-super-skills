@@ -1,0 +1,5 @@
+# cases.md E5 - 접속을 거부당하면 로컬 구동(L)으로 간다. 코드만 읽고 끝내지 않는다
+설명 = 접속 거부되면 로컬로 간다
+skill = verify-impl
+필수문구 = 로컬
+금지명령 = ssh, scp, sshpass

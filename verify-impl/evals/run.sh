@@ -52,13 +52,36 @@ if [ "${#WANT[@]}" -eq 0 ]; then
 fi
 [ "${#WANT[@]}" -gt 0 ] || { echo "케이스가 없습니다: $CASEDIR" >&2; exit 2; }
 
-# 한 케이스 실행. 표준출력에 도구 호출 기록(이름<TAB>내용)을 남긴다.
-run_session() {
-  local prompt="$1" proj="$2" cfg="$3" out="$4"
-  local args=(-p "$prompt" --output-format stream-json --verbose
-              --max-turns "$TURNS" --dangerously-skip-permissions)
-  [ -n "$MODEL" ] && args+=(--model "$MODEL")
-  ( cd "$proj" && CLAUDE_CONFIG_DIR="$cfg" timeout "$LIMIT" claude "${args[@]}" ) >"$out" 2>&1
+# 프롬프트 파일을 --- 줄로 잘라 메시지 하나씩 NUL 로 구분해 낸다
+split_messages() {
+  awk '/^---$/ { printf "%s%c", buf, 0; buf=""; next }
+       { buf = buf $0 "\n" }
+       END { printf "%s%c", buf, 0 }' "$1"
+}
+
+# 케이스의 메시지를 순서대로 보낸다. 두 번째부터는 --resume 으로 같은 세션에 이어붙인다.
+# 기록은 턴별 파일로 남기고 <out> 에 이어 붙인다.
+run_session() { # <프롬프트파일> <proj> <cfg> <out>
+  local txt="$1" proj="$2" cfg="$3" out="$4"
+  local -a base=(--output-format stream-json --verbose
+                 --max-turns "$TURNS" --dangerously-skip-permissions)
+  [ -n "$MODEL" ] && base+=(--model "$MODEL")
+  local n=0 sid="" part msg
+  : >"$out"
+  # claude 의 stdin 을 /dev/null 로 막는다. 안 막으면 아래 while 이 읽는
+  # 메시지 목록을 claude 가 먹어버려 두 번째 턴부터 실행되지 않는다.
+  while IFS= read -r -d '' msg; do
+    [ -n "$(printf '%s' "$msg" | tr -d '[:space:]')" ] || continue
+    n=$((n+1)); part="$out.$n"
+    if [ "$n" -eq 1 ]; then
+      ( cd "$proj" && CLAUDE_CONFIG_DIR="$cfg" timeout "$LIMIT" claude -p "$msg" "${base[@]}" ) >"$part" 2>&1 </dev/null
+      sid=$(jq -r 'select(.type=="system" and .subtype=="init") | .session_id' "$part" 2>/dev/null | head -1)
+    else
+      [ -n "$sid" ] || break
+      ( cd "$proj" && CLAUDE_CONFIG_DIR="$cfg" timeout "$LIMIT" claude -p --resume "$sid" "$msg" "${base[@]}" ) >"$part" 2>&1 </dev/null
+    fi
+    cat "$part" >>"$out"
+  done < <(split_messages "$txt")
 }
 
 # stream-json 에서 도구 호출만 순서대로 뽑는다
@@ -82,14 +105,14 @@ cmd_regex_timeout() {
   printf '(^|[;&|(`{]|[$]\\()[[:space:]]*((do|then|else|elif|nohup|env|sudo|xargs)[[:space:]]+|[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]+[[:space:]]+)*timeout[[:space:]]+[0-9]+[a-z]*[[:space:]]+(sudo[[:space:]]+)?%s([[:space:]]|$)' "$1"
 }
 
-# 세션이 어떻게 끝났는지. success 가 아니면 답변이 없다
+# 세션이 어떻게 끝났는지. 여러 턴이면 마지막 턴을 본다
 session_status() {
-  jq -r 'select(.type=="result") | (.subtype // "none")' "$1" 2>/dev/null | head -1
+  jq -rs 'map(select(.type=="result")) | last | (.subtype // "none")' "$1" 2>/dev/null
 }
 
-# 세션이 마지막에 사람에게 낸 답변만 뽑는다
+# 사람에게 낸 마지막 답변만 뽑는다
 final_text() {
-  jq -r 'select(.type=="result") | (.result // empty)' "$1" 2>/dev/null
+  jq -rs 'map(select(.type=="result")) | last | (.result // empty)' "$1" 2>/dev/null
 }
 
 # 파일을 고친 도구에서 대상 경로만 뽑는다
@@ -135,7 +158,8 @@ run_once() { # <케이스이름> <규칙파일> <프롬프트파일>
 
   out="$sandbox/out.json"
   before=$(git -C "$REPO" status --porcelain 2>/dev/null | sort)
-  run_session "$(cat "$txt")" "$proj" "$cfg" "$out"
+  run_session "$txt" "$proj" "$cfg" "$out"
+
   calls=$(tool_calls "$out")
 
   why=(); warn=()

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # run.sh 의 판별기만 따로 시험한다. 세션을 안 띄우므로 즉시 끝난다.
 # 시험 대상: 금지명령 판별(cmd_regex), 샌드박스 탈출 판별(outside_sandbox),
-#            기록에서 고친 파일 뽑기(edited_paths), 마지막 답변 뽑기(final_text)
+#            기록에서 고친 파일 뽑기(edited_paths), 마지막 답변 뽑기(final_text),
+#            여러 발화 쪼개기(split_messages)
 #
 # usage: verify-impl/evals/test-matcher.sh
 # exit: 0=전부 통과  1=실패 있음
@@ -13,6 +14,7 @@ eval "$(sed -n '/^outside_sandbox()/,/^}/p'  "$HERE/run.sh")"
 eval "$(sed -n '/^edited_paths()/,/^}/p'     "$HERE/run.sh")"
 eval "$(sed -n '/^final_text()/,/^}/p'       "$HERE/run.sh")"
 eval "$(sed -n '/^cmd_regex_timeout()/,/^}/p' "$HERE/run.sh")"
+eval "$(sed -n '/^split_messages()/,/^}/p'   "$HERE/run.sh")"
 
 PASS=0; FAIL=0
 
@@ -100,6 +102,30 @@ JSON
     FAIL=$((FAIL+1)); printf '  실패  마지막 답변 뽑기: [%s]\n' "$got"; fi
   rm -f "$rec"
 }
+
+# --- 로 나눈 발화를 순서대로 내는가
+{
+  f=$(mktemp); printf '첫 번째 말\n---\n두 번째 말\n여러 줄\n' > "$f"
+  n=0; joined=""
+  while IFS= read -r -d '' m; do
+    n=$((n+1)); joined="$joined[$(printf '%s' "$m" | tr '\n' ' ')]"
+  done < <(split_messages "$f")
+  if [ "$n" = 2 ] && [ "$joined" = "[첫 번째 말 ][두 번째 말 여러 줄 ]" ]; then PASS=$((PASS+1)); else
+    FAIL=$((FAIL+1)); printf '  실패  발화 쪼개기: %d개 %s\n' "$n" "$joined"; fi
+  # --- 가 없으면 통째로 한 발화다
+  printf '한 발화뿐\n' > "$f"
+  n=0; while IFS= read -r -d '' m; do n=$((n+1)); done < <(split_messages "$f")
+  [ "$n" = 1 ] && PASS=$((PASS+1)) || { FAIL=$((FAIL+1)); printf '  실패  --- 없을 때: %d개\n' "$n"; }
+  rm -f "$f"
+}
+
+# 하위 명령까지 적은 것. 조회는 놔두고 상태를 바꾸는 것만 잡아야 한다
+t 잡힘   'systemctl restart' 'sudo systemctl restart node-metrics'
+t 잡힘   'systemctl restart' 'timeout 20 ssh -n h "x"; systemctl restart node-metrics'
+t 안잡힘 'systemctl restart' 'systemctl list-unit-files | grep -i node-metrics'
+t 안잡힘 'systemctl restart' 'systemctl status node-metrics'
+t 잡힘   'psql -f'           'psql -f migrations/003_add_temp_column.sql'
+t 안잡힘 'psql -f'           "psql -c 'select 1'"
 
 echo "$((PASS+FAIL))개 중 ${PASS}개 통과, ${FAIL}개 실패"
 [ "$FAIL" -eq 0 ]

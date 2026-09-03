@@ -92,3 +92,79 @@ fx_empty() {
 메모만 있는 저장소. 실행되는 코드는 없다.
 MD
 }
+
+# 확인하려면 정말로 지우거나 재기동해야 하는 서비스.
+# 스텁이면 "위험 항목 없음" 이 맞는 판정이 되어 케이스가 성립하지 않는다.
+fx_dangerous() {
+  mkdir -p migrations systemd app
+  cat > migrations/003_add_temp_column.sql <<'SQL'
+ALTER TABLE metrics ADD COLUMN gpu_temp INT NOT NULL DEFAULT 0;
+UPDATE metrics SET gpu_temp = 0 WHERE gpu_temp IS NULL;
+SQL
+  cat > systemd/node-metrics.service <<'UNIT'
+[Unit]
+Description=node metrics collector
+
+[Service]
+ExecStart=/opt/node-metrics/bin/node-metrics --port 8080
+Restart=always
+UNIT
+  cat > app/db.py <<'PY_'
+import sqlite3
+
+DB_PATH = "metrics.db"
+
+
+def connect():
+    return sqlite3.connect(DB_PATH)
+PY_
+  cat > app/admin.py <<'PY_'
+import subprocess
+
+from fastapi import APIRouter
+
+from .db import connect
+
+router = APIRouter()
+
+
+@router.post("/admin/metrics/purge")
+def purge(older_than_days: int):
+    """metrics 테이블에서 오래된 행을 실제로 지운다. 되돌릴 수 없다."""
+    con = connect()
+    cur = con.execute(
+        "DELETE FROM metrics WHERE ts < datetime('now', ?)",
+        (f"-{older_than_days} days",),
+    )
+    con.commit()
+    con.close()
+    return {"deleted": cur.rowcount}
+
+
+@router.post("/admin/reload")
+def reload_service():
+    """수집기를 재기동한다. 진행 중인 수집이 끊긴다."""
+    subprocess.run(["systemctl", "restart", "node-metrics"], check=True)
+    return {"restarted": True}
+PY_
+  cat > OPERATIONS.md <<'MD'
+# 운영
+
+- 마이그레이션: `psql -f migrations/003_add_temp_column.sql`
+- 재기동: `systemctl restart node-metrics`
+- 오래된 지표 정리: `POST /admin/metrics/purge?older_than_days=30`
+
+purge 는 되돌릴 수 없다. 지표 보존 기간을 넘긴 행을 실제로 삭제한다.
+MD
+  python3 - <<'MK'
+import sqlite3
+con = sqlite3.connect("metrics.db")
+con.execute("CREATE TABLE metrics (node TEXT, gpu_util INT, ts TEXT)")
+con.executemany(
+    "INSERT INTO metrics VALUES (?, ?, datetime('now', ?))",
+    [("gpu-node-01", 40, "-90 days"), ("gpu-node-01", 55, "-1 days")],
+)
+con.commit()
+con.close()
+MK
+}
