@@ -171,6 +171,27 @@ if printf '%s\n' "${STAGED[@]}" | grep -qE '(^|/)\.claude/verify-targets\.md$|(^
   FAIL=1
 fi
 
+# 셸 스크립트는 shellcheck 로 한 번 더 본다. 없으면 조용히 넘어간다.
+# error 급만 막는다. warning 까지는 shared/scripts/lint-shell.sh 로 사람이 본다.
+# 스테이지된 조각이 아니라 워킹트리의 파일 전체를 본다 - 문법 검사는 조각으로는 못 한다.
+if command -v shellcheck >/dev/null; then
+  SHFILES=()
+  for f in "${STAGED[@]}"; do
+    case "$f" in *.sh) SHFILES+=("$f"); continue ;; esac
+    head -c 40 "$f" 2>/dev/null | head -1 \
+      | grep -qE '^#!.*[ /](bash|sh|dash|ksh)( |$)' && SHFILES+=("$f")
+  done
+  if [ "${#SHFILES[@]}" -gt 0 ]; then
+    shout=$(shellcheck -S error -- "${SHFILES[@]}" 2>&1)
+    if [ -n "$shout" ]; then
+      red "차단: 셸 스크립트 오류"
+      echo "$shout" | head -20 | sed 's/^/    /'
+      echo "    -> shared/scripts/lint-shell.sh 로 전부 보세요"
+      FAIL=1
+    fi
+  fi
+fi
+
 # 규칙 파일을 고쳤으면 회귀를 돌려볼 것을 알린다. 막지는 않는다.
 # 검증은 세션을 띄우므로 시간과 토큰이 든다. 돌릴지는 사람이 정한다.
 # evals 가 있는 repo(= 이 skills repo)에서만 뜬다.

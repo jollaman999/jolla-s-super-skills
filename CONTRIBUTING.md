@@ -26,7 +26,9 @@ scripts/ssh-run.sh VF-01 '...'                             # 안 됩니다
 
 ## 문서를 고친 뒤
 
-- 스크립트를 고쳤으면 `bash -n <파일>` 로 문법을 봅니다.
+- 스크립트를 고쳤으면 `shared/scripts/lint-shell.sh` 로 봅니다. `bash -n` 은 문법만 보고
+  따옴표 안 씌운 변수나 배열 오독은 지나갑니다. `shellcheck` 이 없으면 깔 방법을 알려줍니다.
+  커밋 훅은 `error` 급만 막습니다. `warning` 은 이 스크립트로 사람이 봅니다.
 - 규칙(`CLAUDE.md`, `SKILL.md`)을 고쳤으면 `verify-impl/evals/run.sh` 로 회귀를 봅니다. 세션을 실제로 띄워서
   규칙을 지키는지 확인합니다. 케이스 목록과 쓰는 법은 `verify-impl/evals/README.md` 에 있습니다.
 - 제목에 개수를 적지 않습니다 (`네 가지`, `5필드`). 항목이 늘면 어긋납니다.

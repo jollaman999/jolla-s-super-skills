@@ -62,6 +62,10 @@
 | em dash | 항상 |
 | 홈 경로·repo 절대경로가 박힌 줄 | 항상 |
 | `.claude/verify-targets.md` 등 접속 대상 파일 | 항상 |
+| 셸 스크립트의 shellcheck `error` | 항상 (shellcheck 이 깔려 있을 때만) |
+
+shellcheck 이 없는 환경에서는 그 검사만 조용히 건너뜁니다. `warning` 까지 보려면
+`shared/scripts/lint-shell.sh` 를 직접 돌립니다.
 
 **막지 않고 알리기만 하는 것이 하나 있습니다.** `CLAUDE.md` 나 `SKILL.md` 가 스테이지되면
 회귀를 돌려볼 명령을 한 줄 띄우고 커밋은 그대로 진행합니다. 검증은 세션을 실제로 띄우므로
