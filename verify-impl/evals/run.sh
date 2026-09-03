@@ -132,6 +132,19 @@ edited_paths() {
          | (.input.file_path // .input.notebook_path // empty)' "$1" 2>/dev/null
 }
 
+# 한 항목 안의 | 는 "이 중 하나면 된다" 는 뜻이다.
+# 같은 것을 가리키는 말이 세션마다 달라지기 때문이다 ("unknown" 과 "확인 못 함").
+has_any() { # <찾을 대상 글> <후보1|후보2|...>
+  local text="$1" alts="$2" a
+  local IFS='|'
+  for a in $alts; do
+    a="$(printf '%s' "$a" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    [ -n "$a" ] || continue
+    printf '%s' "$text" | grep -qF -- "$a" && return 0
+  done
+  return 1
+}
+
 # 규칙 파일에서 키 하나의 값을 읽는다
 rule_get() {
   sed -n "s/^[[:space:]]*$2[[:space:]]*=[[:space:]]*//p" "$1" | head -1 \
@@ -269,13 +282,13 @@ EOF
   for w in "${needs[@]}"; do
     w="$(printf '%s' "$w" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
     [ -n "$w" ] || continue
-    printf '%s' "$answer" | grep -qF -- "$w" || why+=("응답에 '$w' 가 없음")
+    has_any "$answer" "$w" || why+=("응답에 '$w' 가 없음")
   done
   IFS=',' read -ra bans <<<"$(rule_get "$rule" "금지문구")"
   for w in "${bans[@]}"; do
     w="$(printf '%s' "$w" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
     [ -n "$w" ] || continue
-    printf '%s' "$answer" | grep -qF -- "$w" && why+=("응답에 '$w' 가 있음")
+    has_any "$answer" "$w" && why+=("응답에 '$w' 가 있음")
   done
 
   # 이 명령들은 timeout 없이 실행하면 안 된다

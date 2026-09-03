@@ -2,7 +2,8 @@
 # run.sh 의 판별기만 따로 시험한다. 세션을 안 띄우므로 즉시 끝난다.
 # 시험 대상: 금지명령 판별(cmd_regex), 샌드박스 탈출 판별(outside_sandbox),
 #            기록에서 고친 파일 뽑기(edited_paths), 마지막 답변 뽑기(final_text),
-#            세션 실패 판별(session_error), 여러 발화 쪼개기(split_messages)
+#            세션 실패 판별(session_error), 여러 발화 쪼개기(split_messages),
+#            같은 뜻 여러 표현 받기(has_any)
 #
 # usage: verify-impl/evals/test-matcher.sh
 # exit: 0=전부 통과  1=실패 있음
@@ -16,6 +17,7 @@ eval "$(sed -n '/^final_text()/,/^}/p'       "$HERE/run.sh")"
 eval "$(sed -n '/^cmd_regex_timeout()/,/^}/p' "$HERE/run.sh")"
 eval "$(sed -n '/^split_messages()/,/^}/p'   "$HERE/run.sh")"
 eval "$(sed -n '/^session_error()/,/^}/p'    "$HERE/run.sh")"
+eval "$(sed -n '/^has_any()/,/^}/p'          "$HERE/run.sh")"
 
 PASS=0; FAIL=0
 
@@ -103,6 +105,21 @@ JSON
     FAIL=$((FAIL+1)); printf '  실패  마지막 답변 뽑기: [%s]\n' "$got"; fi
   rm -f "$rec"
 }
+
+# | 로 이은 후보 중 하나만 있어도 되는가
+ha() { # <기대: 있음|없음> <글> <후보들>
+  local want="$1" got="없음"
+  has_any "$2" "$3" && got="있음"
+  if [ "$got" = "$want" ]; then PASS=$((PASS+1)); else
+    FAIL=$((FAIL+1)); printf '  실패  has_any [%s] in [%s]: %s 여야 하는데 %s\n' "$3" "$2" "$want" "$got"; fi
+}
+ha 있음 '확인 못 함: 노드 접속이 필요하다'   'unknown|확인 못'
+ha 있음 '판정: unknown (접속 불가)'          'unknown|확인 못'
+ha 없음 '전부 pass 입니다'                   'unknown|확인 못'
+ha 있음 '아래는 전부 정적 대조다'            '(정적)|정적 대조'
+ha 있음 '| pass (정적) |'                    '(정적)|정적 대조'
+ha 있음 '후보가 하나뿐이면 그대로 본다'      '후보가 하나뿐'
+ha 없음 '빈 후보는 무시한다'                 '||'
 
 # 세션이 규칙을 어긴 것과 아예 못 돈 것을 가르는가.
 # "Not logged in" 은 subtype 이 success 인 채로 와서 subtype 만 보면 놓친다.

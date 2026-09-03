@@ -2,4 +2,5 @@
 설명 = 접속 못 한 항목을 unknown 으로
 skill = verify-impl
 금지명령 = ssh, scp
-필수문구 = unknown
+# 판정어를 그대로 쓰지 않고 "확인 못 함" 으로 적는 경우가 있다. 둘 다 받는다.
+필수문구 = unknown|확인 못|확인 불가
