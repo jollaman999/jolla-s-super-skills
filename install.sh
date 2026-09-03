@@ -321,7 +321,7 @@ fi
 
 if [ -z "$MODE" ] && [ "$DRY" -eq 0 ]; then
   if symlink_works "$DEST"; then
-    MODE=link
+    MODE="link"
   else
     link_failed_notice
     if ! ask; then
@@ -353,7 +353,7 @@ if [ -z "$MODE" ] && [ "$DRY" -eq 0 ]; then
     say
   fi
 fi
-[ -z "$MODE" ] && MODE=link
+[ -z "$MODE" ] && MODE="link"
 
 # --- 설치 ---
 PLACED=()

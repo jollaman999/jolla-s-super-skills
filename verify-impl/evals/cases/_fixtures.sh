@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # 케이스별 .setup 에서 부르는 가짜 프로젝트 조각들.
 #   . "$(dirname "$0")/_fixtures.sh"
 # 프로젝트 폴더 안에서 실행된다. 여기서 만든 것은 샌드박스와 함께 사라진다.

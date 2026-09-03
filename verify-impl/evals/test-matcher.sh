@@ -149,7 +149,7 @@ command -v jq >/dev/null && {
   f=$(mktemp); printf '첫 번째 말\n---\n두 번째 말\n여러 줄\n' > "$f"
   n=0; joined=""
   while IFS= read -r -d '' m; do
-    n=$((n+1)); joined="$joined[$(printf '%s' "$m" | tr '\n' ' ')]"
+    n=$((n+1)); joined="${joined}[$(printf '%s' "$m" | tr '\n' ' ')]"
   done < <(split_messages "$f")
   if [ "$n" = 2 ] && [ "$joined" = "[첫 번째 말 ][두 번째 말 여러 줄 ]" ]; then PASS=$((PASS+1)); else
     FAIL=$((FAIL+1)); printf '  실패  발화 쪼개기: %d개 %s\n' "$n" "$joined"; fi

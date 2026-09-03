@@ -58,7 +58,7 @@ echo "## 버전이 고정돼 있는 곳 (반영을 빠뜨려도 티가 안 나�
 echo
 PINNED=0
 for d in "${TARGETS[@]}"; do
-  out=$(grep -rInE "$NAME[:@/-]?v?[0-9]+\.[0-9]+(\.[0-9]+)?" "$d" \
+  out=$(grep -rInE "${NAME}[:@/-]?v?[0-9]+\.[0-9]+(\.[0-9]+)?" "$d" \
         --include='*.yaml' --include='*.yml' --include='*.tf' --include='*.tfvars' \
         --include='*.json' --include='*.env' --include='Makefile' --include='*.mk' \
         --include='*.sh' --include='*.go' --include='*.md' \

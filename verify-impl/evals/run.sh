@@ -343,7 +343,7 @@ for name in "${WANT[@]}"; do
   [ -f "$rule" ] || { echo "$name  건너뜀 (규칙 파일 없음)"; continue; }
 
   desc=$(rule_get "$rule" "설명")
-  ok=0; bad=0; errs=""; reasons=""; warns=""; keeps=""
+  ok=0; ng=0; errs=""; reasons=""; warns=""; keeps=""
   rep=1
   while [ "$rep" -le "$REPS" ]; do
     result=$(run_once "$name" "$rule" "$txt")
@@ -352,7 +352,7 @@ for name in "${WANT[@]}"; do
     if [ -n "$es" ]; then
       errs="$errs$es
 "
-    elif [ -z "$rs" ]; then ok=$((ok+1)); else bad=$((bad+1)); reasons="$reasons$rs
+    elif [ -z "$rs" ]; then ok=$((ok+1)); else ng=$((ng+1)); reasons="$reasons$rs
 "; fi
     warns="$warns$(printf '%s\n' "$result" | sed -n 's/^W://p')
 "
@@ -362,7 +362,7 @@ for name in "${WANT[@]}"; do
   done
 
   # 판정은 실제로 돌아간 횟수 기준이다. 돌리지 못한 회차는 분모에서 뺀다.
-  ran=$((ok+bad))
+  ran=$((ok+ng))
   if [ "$ran" -eq 0 ]; then
     verdict="돌리지 못함"
   elif [ "$REPS" -eq 1 ]; then
@@ -381,7 +381,7 @@ for name in "${WANT[@]}"; do
   printf '%s' "$keeps"   | grep -v '^$' | sed 's/^/       기록: /'
 
   if   [ "$ran" -eq 0 ]; then ERR=$((ERR+1)); ERRED+=("$name")
-  elif [ "$bad" -eq 0 ]; then PASS=$((PASS+1))
+  elif [ "$ng" -eq 0 ]; then PASS=$((PASS+1))
   else FAIL=$((FAIL+1)); FAILED+=("$name"); fi
 done
 
