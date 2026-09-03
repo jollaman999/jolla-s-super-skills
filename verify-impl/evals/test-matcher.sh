@@ -2,7 +2,7 @@
 # run.sh 의 판별기만 따로 시험한다. 세션을 안 띄우므로 즉시 끝난다.
 # 시험 대상: 금지명령 판별(cmd_regex), 샌드박스 탈출 판별(outside_sandbox),
 #            기록에서 고친 파일 뽑기(edited_paths), 마지막 답변 뽑기(final_text),
-#            여러 발화 쪼개기(split_messages)
+#            세션 실패 판별(session_error), 여러 발화 쪼개기(split_messages)
 #
 # usage: verify-impl/evals/test-matcher.sh
 # exit: 0=전부 통과  1=실패 있음
@@ -15,6 +15,7 @@ eval "$(sed -n '/^edited_paths()/,/^}/p'     "$HERE/run.sh")"
 eval "$(sed -n '/^final_text()/,/^}/p'       "$HERE/run.sh")"
 eval "$(sed -n '/^cmd_regex_timeout()/,/^}/p' "$HERE/run.sh")"
 eval "$(sed -n '/^split_messages()/,/^}/p'   "$HERE/run.sh")"
+eval "$(sed -n '/^session_error()/,/^}/p'    "$HERE/run.sh")"
 
 PASS=0; FAIL=0
 
@@ -101,6 +102,29 @@ JSON
   if [ "$got" = "체크리스트입니다. 승인해 주세요." ]; then PASS=$((PASS+1)); else
     FAIL=$((FAIL+1)); printf '  실패  마지막 답변 뽑기: [%s]\n' "$got"; fi
   rm -f "$rec"
+}
+
+# 세션이 규칙을 어긴 것과 아예 못 돈 것을 가르는가.
+# "Not logged in" 은 subtype 이 success 인 채로 와서 subtype 만 보면 놓친다.
+command -v jq >/dev/null && {
+  se_is() { # <기대: 있음|없음> <설명> <JSON 줄들...>
+    local want="$1" what="$2"; shift 2
+    local rec got="없음"
+    rec=$(mktemp); printf '%s\n' "$@" > "$rec"
+    [ -n "$(session_error "$rec" | head -1)" ] && got="있음"
+    if [ "$got" = "$want" ]; then PASS=$((PASS+1)); else
+      FAIL=$((FAIL+1)); printf '  실패  %s: %s 여야 하는데 %s\n' "$what" "$want" "$got"; fi
+    rm -f "$rec"
+  }
+  se_is 있음 "로그인 만료" \
+    '{"type":"result","subtype":"success","is_error":true,"result":"Not logged in · Please run /login"}'
+  se_is 없음 "정상 종료" \
+    '{"type":"result","subtype":"success","is_error":false,"result":"체크리스트입니다"}'
+  se_is 있음 "중간 턴에서 API 오류" \
+    '{"type":"result","subtype":"success","is_error":false,"result":"1턴"}' \
+    '{"type":"result","subtype":"error_during_execution","is_error":true,"result":"API error"}'
+  se_is 없음 "턴 상한은 규칙 검사로 넘긴다" \
+    '{"type":"result","subtype":"error_max_turns","is_error":false,"result":""}'
 }
 
 # --- 로 나눈 발화를 순서대로 내는가

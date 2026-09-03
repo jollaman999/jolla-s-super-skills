@@ -12,7 +12,7 @@
 #   --turns    : 세션 최대 턴 수 (기본 30). 모자라면 답변 전에 잘린다
 #   --timeout  : 세션 하나의 제한 시간, 초 (기본 420)
 #
-# exit: 0=전부 통과  1=실패 있음  2=사용법 오류
+# exit: 0=전부 통과  1=규칙 실패 있음  2=사용법 오류 또는 세션을 못 돌림
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -110,6 +110,15 @@ session_status() {
   jq -rs 'map(select(.type=="result")) | last | (.subtype // "none")' "$1" 2>/dev/null
 }
 
+# 세션 자체가 실패했는가. 로그인 만료·API 오류·요금 한도가 여기 걸린다.
+# 이런 것은 규칙 위반이 아니라 돌리지 못한 것이다. "Not logged in" 은
+# subtype 이 success 인 채로 오므로 subtype 만 보면 놓친다.
+session_error() {
+  jq -rs 'map(select(.type=="result" and .is_error == true)) | first
+          | if . == null then empty
+            else ((.subtype // "error") + ": " + ((.result // "") | tostring)) end' "$1" 2>/dev/null
+}
+
 # 사람에게 낸 마지막 답변만 뽑는다
 final_text() {
   jq -rs 'map(select(.type=="result")) | last | (.result // empty)' "$1" 2>/dev/null
@@ -143,7 +152,7 @@ cmd_regex() {
 #   K:<경로>  --keep 일 때 남긴 기록 파일
 run_once() { # <케이스이름> <규칙파일> <프롬프트파일>
   local name="$1" rule="$2" txt="$3"
-  local sandbox cfg proj out before after status answer calls bash_cmds first early hit bare w c t e line
+  local sandbox cfg proj out before after status answer calls bash_cmds first early hit bare err w c t e line
   local -a why warn needs bans bad ban tos leaks exs need
   sandbox=$(mktemp -d); cfg="$sandbox/.claude"; proj="$sandbox/proj"
   mkdir -p "$cfg" "$proj"
@@ -159,6 +168,15 @@ run_once() { # <케이스이름> <규칙파일> <프롬프트파일>
   out="$sandbox/out.json"
   before=$(git -C "$REPO" status --porcelain 2>/dev/null | sort)
   run_session "$txt" "$proj" "$cfg" "$out"
+
+  # 규칙을 보기 전에 세션이 제대로 돌았는지부터 본다. 로그인이 풀린 세션의
+  # 빈 답변을 "규칙을 안 지켰다" 로 읽으면 그게 무음 실패다.
+  err=$(session_error "$out" | head -1)
+  if [ -n "$err" ]; then
+    printf 'E:%s\n' "$(printf '%s' "$err" | cut -c1-120)"
+    printf 'K:%s\n' "$out"
+    return
+  fi
 
   calls=$(tool_calls "$out")
 
@@ -304,7 +322,7 @@ EOF
   fi
 }
 
-PASS=0; FAIL=0; FAILED=()
+PASS=0; FAIL=0; ERR=0; FAILED=(); ERRED=()
 
 for name in "${WANT[@]}"; do
   txt="$CASEDIR/$name.txt"; rule="$CASEDIR/$name.rule"
@@ -312,12 +330,16 @@ for name in "${WANT[@]}"; do
   [ -f "$rule" ] || { echo "$name  건너뜀 (규칙 파일 없음)"; continue; }
 
   desc=$(rule_get "$rule" "설명")
-  ok=0; reasons=""; warns=""; keeps=""
+  ok=0; bad=0; errs=""; reasons=""; warns=""; keeps=""
   rep=1
   while [ "$rep" -le "$REPS" ]; do
     result=$(run_once "$name" "$rule" "$txt")
+    es=$(printf '%s\n' "$result" | sed -n 's/^E://p')
     rs=$(printf '%s\n' "$result" | sed -n 's/^R://p')
-    if [ -z "$rs" ]; then ok=$((ok+1)); else reasons="$reasons$rs
+    if [ -n "$es" ]; then
+      errs="$errs$es
+"
+    elif [ -z "$rs" ]; then ok=$((ok+1)); else bad=$((bad+1)); reasons="$reasons$rs
 "; fi
     warns="$warns$(printf '%s\n' "$result" | sed -n 's/^W://p')
 "
@@ -326,27 +348,39 @@ for name in "${WANT[@]}"; do
     rep=$((rep+1))
   done
 
-  if [ "$REPS" -eq 1 ]; then
+  # 판정은 실제로 돌아간 횟수 기준이다. 돌리지 못한 회차는 분모에서 뺀다.
+  ran=$((ok+bad))
+  if [ "$ran" -eq 0 ]; then
+    verdict="돌리지 못함"
+  elif [ "$REPS" -eq 1 ]; then
     [ "$ok" -eq 1 ] && verdict="통과" || verdict="실패"
   else
-    verdict="$ok/$REPS 통과"
+    verdict="$ok/$ran 통과"
+    [ "$ran" -lt "$REPS" ] && verdict="$verdict ($((REPS-ran))회는 못 돌림)"
   fi
   printf '%-4s %-34s %s\n' "$name" "$desc" "$verdict"
 
   # 같은 사유가 여러 번 나오면 한 줄로 합친다
   printf '%s' "$reasons" | grep -v '^$' | sort | uniq -c | sort -rn \
     | sed 's/^ *\([0-9]*\) /       - (\1회) /'
+  printf '%s' "$errs"    | grep -v '^$' | sort -u | sed 's/^/       세션 실패 /'
   printf '%s' "$warns"   | grep -v '^$' | sort -u | sed 's/^/       경고 /'
   printf '%s' "$keeps"   | grep -v '^$' | sed 's/^/       기록: /'
 
-  if [ "$ok" -eq "$REPS" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); FAILED+=("$name"); fi
+  if   [ "$ran" -eq 0 ]; then ERR=$((ERR+1)); ERRED+=("$name")
+  elif [ "$bad" -eq 0 ]; then PASS=$((PASS+1))
+  else FAIL=$((FAIL+1)); FAILED+=("$name"); fi
 done
 
 echo
 if [ "$REPS" -eq 1 ]; then
   echo "$((PASS+FAIL))개 중 ${PASS}개 통과, ${FAIL}개 실패"
 else
-  echo "$((PASS+FAIL))개 중 ${PASS}개가 ${REPS}회 전부 통과, ${FAIL}개는 한 번이라도 실패"
+  echo "$((PASS+FAIL))개 중 ${PASS}개가 전부 통과, ${FAIL}개는 한 번이라도 실패"
+fi
+if [ "$ERR" -gt 0 ]; then
+  echo "돌리지 못함: ${ERRED[*]} - 규칙이 아니라 환경 문제입니다. 로그인이 풀렸는지 보세요"
+  exit 2
 fi
 [ "$FAIL" -eq 0 ] || { echo "실패: ${FAILED[*]}"; exit 1; }
 exit 0
