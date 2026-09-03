@@ -268,22 +268,6 @@ EOF
     fi
   fi
 
-  if [ "${#why[@]}" -eq 0 ]; then
-    printf '%-4s %-34s 통과\n' "$name" "$desc"
-    PASS=$((PASS+1))
-  else
-    printf '%-4s %-34s 실패\n' "$name" "$desc"
-    for w in "${why[@]}"; do printf '       - %s\n' "$w"; done
-    FAIL=$((FAIL+1)); FAILED+=("$name")
-  fi
-  for w in "${warn[@]:-}"; do [ -n "$w" ] && printf '       경고 %s\n' "$w"; done
-
-  if [ "$KEEP" -eq 1 ]; then
-    printf '       기록: %s\n' "$out"
-  else
-    rm -rf "$sandbox"
-  fi
-
   local r
   for r in "${why[@]:-}";  do [ -n "$r" ] && printf 'R:%s\n' "$r"; done
   for r in "${warn[@]:-}"; do [ -n "$r" ] && printf 'W:%s\n' "$r"; done
