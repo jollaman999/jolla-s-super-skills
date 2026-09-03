@@ -23,13 +23,23 @@
 ```sh
 verify-impl/evals/run.sh                 # 전부
 verify-impl/evals/run.sh E2              # 하나만
-verify-impl/evals/run.sh E2 --keep       # 기록 파일을 안 지운다. 왜 실패했는지 직접 볼 때
+verify-impl/evals/run.sh E2 --keep       # 통과한 회차의 기록까지 남긴다
 verify-impl/evals/run.sh E2 --reps 5     # 5번 돌려 몇 번 통과하는지 센다
 verify-impl/evals/run.sh --model claude-opus-5   # 모델 고정. 비교할 때는 고정해야 한다
 verify-impl/evals/test-matcher.sh        # 명령 판별기만 시험. 세션을 안 띄워서 즉시 끝난다
 ```
 
 세션 하나에 1~3분 걸립니다. 케이스가 늘면 그만큼 곱하기입니다.
+
+**실패한 회차의 기록은 `--keep` 없이도 남습니다.** 결과 줄 아래에 경로가 찍힙니다.
+실패가 진짜 규칙 위반인지 표현만 다른 것인지는 그 파일을 열어야 갈립니다.
+남은 폴더는 `/tmp` 에 쌓이므로 다 본 뒤에는 지웁니다 (기록 하나에 200KB 안팎입니다).
+
+```sh
+jq -rs 'map(select(.type=="result")) | last | .result' <기록>        # 마지막 답변
+jq -r 'select(.type=="assistant") | .message.content[]?
+       | select(.type=="tool_use") | .name' <기록> | sort | uniq -c  # 쓴 도구
+```
 
 ## 케이스 만들기
 

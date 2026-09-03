@@ -295,7 +295,13 @@ EOF
   local r
   for r in "${why[@]:-}";  do [ -n "$r" ] && printf 'R:%s\n' "$r"; done
   for r in "${warn[@]:-}"; do [ -n "$r" ] && printf 'W:%s\n' "$r"; done
-  if [ "$KEEP" -eq 1 ]; then printf 'K:%s\n' "$out"; else rm -rf "$sandbox"; fi
+  # 실패한 회차의 기록은 --keep 없이도 남긴다. 기록이 필요해지는 시점은
+  # 실패를 본 뒤인데, 그때 지워져 있으면 같은 것을 또 돌려야 한다.
+  if [ "$KEEP" -eq 1 ] || [ "${#why[@]}" -gt 0 ]; then
+    printf 'K:%s\n' "$out"
+  else
+    rm -rf "$sandbox"
+  fi
 }
 
 PASS=0; FAIL=0; FAILED=()
