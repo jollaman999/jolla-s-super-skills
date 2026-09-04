@@ -182,6 +182,7 @@ fi
 LINKS=(
   "CLAUDE.md:CLAUDE.md"
   "design-first:skills/design-first"
+  "plan-run:skills/plan-run"
   "verify-impl:skills/verify-impl"
   "deploy-verify:skills/deploy-verify"
   "release-cut:skills/release-cut"
