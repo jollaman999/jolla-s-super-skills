@@ -115,7 +115,29 @@ tool_calls() {
   jq -r --arg nl "$NLMARK" 'select(.type=="assistant") | .message.content[]?
          | select(.type=="tool_use")
          | [.name, ((.input.command // .input.file_path // .input.skill // .input.prompt // "") | tostring | gsub("\n";$nl))]
-         | @tsv' "$1" 2>/dev/null
+         | @tsv' "$1" 2>/dev/null | untsv
+}
+
+# @tsv 는 명령 안의 탭·CR·백슬래시를 \t \r \\ 두 글자로 바꿔서 낸다.
+# 그대로 두면 <<- 의 탭 들여쓴 닫는 구분자가 \tEOF 로 보여 heredoc 이 안 닫히고,
+# 그 뒤 명령 전체가 본문으로 삼켜져 위반을 놓친다. 이름/명령 구분자인 첫 탭은
+# 그대로 두고, 그 뒤만 원래 글자로 되돌린다. 줄바꿈은 표식으로 남긴다.
+untsv() {
+  awk -v nl="$NLMARK" '{
+    p = index($0, "\t")
+    if (p == 0) { print; next }
+    head = substr($0, 1, p); s = substr($0, p + 1); out = ""
+    while (match(s, /\\[trn\\]/)) {
+      out = out substr(s, 1, RSTART - 1)
+      c = substr(s, RSTART + 1, 1)
+      if      (c == "t") out = out "\t"
+      else if (c == "r") out = out "\r"
+      else if (c == "n") out = out nl
+      else               out = out "\\"
+      s = substr(s, RSTART + RLENGTH)
+    }
+    print head out s
+  }'
 }
 
 # 고친 파일이 샌드박스 밖인가. 상대경로는 프로젝트 폴더 기준이라 안쪽이다.
