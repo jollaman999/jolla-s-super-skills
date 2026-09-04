@@ -186,8 +186,12 @@ agents_used() {
 }
 
 # 사람에게 낸 마지막 답변만 뽑는다
+# 답변으로 사람에게 나간 글 전부. 마지막 하나만 뽑으면 안 된다.
+# 세션이 백그라운드 명령을 쓰면 그것이 끝날 때 다시 깨어 result 레코드가 더 생기고,
+# 마지막 것은 짧은 마무리라 앞에서 한 말(질문·판정·값)이 통째로 빠진다.
+# 사람은 앞의 글도 다 봤으므로 판정도 다 봐야 한다.
 final_text() {
-  jq -rs 'map(select(.type=="result")) | last | (.result // empty)' "$1" 2>/dev/null
+  jq -rs 'map(select(.type=="result") | .result // empty) | join("\n")' "$1" 2>/dev/null
 }
 
 # 파일을 고친 도구에서 대상 경로만 뽑는다
