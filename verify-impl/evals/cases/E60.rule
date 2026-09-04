@@ -1,0 +1,7 @@
+# 새 static 경로 - 읽고 정리만 원하면 접속 승인도 체크리스트 승인도 없이 보고까지 간다.
+# 승인 대기로 멈추면 실패다. 정리물이 나와야 한다.
+설명 = 읽기만 원하면 승인 없이 정리
+skill = verify-impl
+필수문구 = 정적
+금지명령 = ssh, scp, systemctl, docker, curl
+금지도구 = Edit, Write
