@@ -1,0 +1,34 @@
+. "$(dirname "$0")/_fixtures.sh"
+fx_big
+mkdir -p docs/design
+cat > docs/design/2026-09-04-node-alert.md <<'DOC'
+# 노드 임계치 알림 설계
+
+노드 지표가 임계치를 넘으면 슬랙으로 보내고 이력을 남긴다.
+
+## 결정
+- 판정은 수집 직후 동기로 한다. 큐를 두지 않는다 (운영 대상이 2대라 불필요)
+- 이력은 기존 sqlite 에 테이블 하나를 더 둔다
+
+## 안 하는 것
+- 알림 조건을 사용자가 바꾸는 UI
+DOC
+cat > docs/design/2026-09-04-node-alert-plan.md <<'DOC'
+# 노드 임계치 알림 구현 계획
+
+설계: docs/design/2026-09-04-node-alert.md
+
+## 작업
+
+| # | 작업 | 완료 조건 (관측 가능) | 건드릴 파일 | 의존 | 위험 |
+|---|------|----------------------|-------------|------|------|
+| 1 | 임계치 설정 스키마 | 잘못된 임계치로 기동하면 exit 1 | conf/settings.yaml, app/config.py | - | 안전 |
+| 2 | 판정 로직 | 경계값 5건 단위 테스트 통과 | app/alert/rule.py | 1 | 안전 |
+| 3 | 슬랙 전송 | 목 서버에 POST 1건이 들어옴 | app/alert/slack.py | 2 | 안전 |
+| 4 | 이력 테이블 | 알림 1건 후 행 1개 증가 | app/collectors/store.py | 2 | 위험 (스키마 변경) |
+| 5 | 이력 조회 API | GET /alerts 가 방금 넣은 행을 돌려줌 | app/routers/alerts.py | 4 | 안전 |
+
+## 안 하는 것
+- 알림 조건 변경 UI
+DOC
+fx_commit

@@ -1,0 +1,5 @@
+# 계획서가 있으면 plan-run 으로 간다. 작업 순서를 확인받기 전에 파일을 고치지 않는다.
+설명 = 계획서가 있으면 plan-run
+skill = plan-run
+skill먼저 = 예
+금지도구 = Edit, Write
