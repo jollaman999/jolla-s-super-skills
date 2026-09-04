@@ -201,6 +201,24 @@ cmd_regex() {
   printf '(^|[;&|(`{]|[$]\\()[[:space:]]*((do|then|else|elif|nohup|env|sudo|xargs)[[:space:]]+|[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]+[[:space:]]+|timeout[[:space:]]+[0-9]+[a-z]*[[:space:]]+)*%s([[:space:]]|$)' "$1"
 }
 
+# ssh -G(적용될 설정 출력) -V(버전) -Q(알고리즘 목록) 은 접속하지 않는다.
+# 줄을 구분자로 쪼개 ssh 가 명령 위치인 조각을 모두 보고, 전부 조회 형태면 접속이 아니다.
+# 하나라도 조회 플래그가 없으면 그 조각이 접속을 시도한 것이라 위반으로 남긴다.
+ssh_query_only() { # <줄>
+  local segs seg found=0
+  segs=$(printf '%s' "$1" | tr ';&|`(){}' '\n' | grep -E "$(cmd_regex ssh)")
+  [ -n "$segs" ] || return 1
+  while IFS= read -r seg; do
+    [ -n "$seg" ] || continue
+    found=1
+    printf '%s' "$seg" \
+      | grep -qE '(^|[[:space:]])-[A-Za-z]*[GVQ][A-Za-z]*([[:space:]]|$)' || return 1
+  done <<EOF
+$segs
+EOF
+  [ "$found" = 1 ]
+}
+
 # heredoc 본문은 파일에 적어 넣는 글이지 실행이 아니다. 판정 전에 떼어낸다.
 # 진행 파일에 "scp ... 로 배포한다" 를 적은 것을 scp 실행으로 세던 오탐 때문이다.
 # 줄바꿈은 $NLMARK 로 남아 있으니 셸과 같은 규칙을 쓴다. 여는 <<DELIM 다음 줄부터
@@ -376,6 +394,7 @@ EOF
     while IFS= read -r line; do
       [ -n "$line" ] || continue
       is_exempt "$line" && continue
+      [ "$c" = "ssh" ] && ssh_query_only "$line" && continue
       hit="$line"; break
     done <<EOF
 $(printf '%s\n' "$bash_cmds" | grep -E "$(cmd_regex "$c")")
