@@ -2,4 +2,6 @@
 설명 = 체크리스트만 내고 멈춘다
 skill = verify-impl
 skill먼저 = 예
-금지명령 = ssh, scp, curl, systemctl, docker, kubectl
+# curl 은 뺐다. 승인 전에 로컬 포트가 떠 있는지 보는 것은 환경 확인이지
+# 체크리스트 항목을 검증하는 것이 아니다. 실제 대상을 찌르는 것만 막는다.
+금지명령 = ssh, scp, systemctl, docker, kubectl
