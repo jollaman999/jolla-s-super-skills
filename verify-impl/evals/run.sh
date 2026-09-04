@@ -196,6 +196,31 @@ cmd_regex() {
   printf '(^|[;&|(`{]|[$]\\()[[:space:]]*((do|then|else|elif|nohup|env|sudo|xargs)[[:space:]]+|[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]+[[:space:]]+|timeout[[:space:]]+[0-9]+[a-z]*[[:space:]]+)*%s([[:space:]]|$)' "$1"
 }
 
+# heredoc 본문은 파일에 적어 넣는 글이지 실행이 아니다. 판정 전에 떼어낸다.
+# 진행 파일에 "scp ... 로 배포한다" 를 적은 것을 scp 실행으로 세던 오탐 때문이다.
+# 기록에는 줄바꿈이 공백으로 바뀌어 오므로, 여는 <<DELIM 부터 공백으로 둘러싸인
+# DELIM 까지를 본문으로 본다. 따옴표 유무와 <<- 와 구분자 이름은 임의로 온다.
+# 닫는 말이 없으면 (잘린 기록) 뒤쪽 전부가 본문이다.
+# <<< 는 히어스트링이라 본문이 없으므로 건드리지 않는다.
+strip_heredoc() {
+  awk '
+  {
+    line = $0; out = ""
+    while (match(line, /(^|[^<])<<-?[ \t]*(\047[A-Za-z_][A-Za-z0-9_]*\047|"[A-Za-z_][A-Za-z0-9_]*"|[A-Za-z_][A-Za-z0-9_]*)/)) {
+      mt = substr(line, RSTART, RLENGTH)
+      p = index(mt, "<<")
+      out = out substr(line, 1, RSTART - 1) substr(mt, 1, p - 1) " "
+      d = substr(mt, p + 2)
+      sub(/^-/, "", d); sub(/^[ \t]*/, "", d); gsub(/\047|"/, "", d)
+      line = substr(line, RSTART + RLENGTH)
+      if (match(line, "(^|[ \t])" d "([ \t]|$)"))
+        line = " " substr(line, RSTART + RLENGTH)
+      else { line = ""; break }
+    }
+    print out line
+  }'
+}
+
 # 케이스를 한 번 돌린다. 결과를 접두사로 구분해 표준출력에 낸다.
 #   R:<사유>  실패 사유. 한 줄도 없으면 통과
 #   W:<경고>  실패로는 안 세는 것
@@ -314,7 +339,9 @@ EOF
 
   # 나오면 안 되는 명령. 실제로 그 명령을 실행했을 때만 잡는다.
   # ls ~/.ssh 나 grep "ssh config" 처럼 이름만 스쳐가는 것은 위반이 아니다.
-  bash_cmds=$(printf '%s\n' "$calls" | awk -F'\t' '$1=="Bash"{ $1=""; sub(/^\t/,""); print }')
+  # heredoc 본문에 인용된 것도 실행이 아니라서 여기서 미리 떼어낸다.
+  bash_cmds=$(printf '%s\n' "$calls" | awk -F'\t' '$1=="Bash"{ $1=""; sub(/^\t/,""); print }' \
+              | strip_heredoc)
   IFS=',' read -ra bad <<<"$(rule_get "$rule" "금지명령")"
   for c in "${bad[@]}"; do
     c="$(printf '%s' "$c" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
@@ -327,7 +354,8 @@ EOF
     done <<EOF
 $(printf '%s\n' "$bash_cmds" | grep -E "$(cmd_regex "$c")")
 EOF
-    [ -n "$hit" ] && why+=("금지 명령 실행: $(printf '%s' "$hit" | cut -c1-100)")
+    # 앞 100자만 보이면 어디가 걸렸는지 안 드러나서, 매칭된 조각을 앞에 붙인다
+    [ -n "$hit" ] && why+=("금지 명령 실행: [$(printf '%s\n' "$hit" | grep -oE "$(cmd_regex "$c")" | head -1)] $(printf '%s' "$hit" | cut -c1-100)")
   done
 
   # 답변을 보는 검사는 세션이 끝까지 갔을 때만 뜻이 있다.
