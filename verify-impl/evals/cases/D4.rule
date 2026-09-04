@@ -1,4 +1,8 @@
 # design-first 갈래 판정 - 고칠 흐름이 이미 있으면 bounded. 설계만 내고 멈춘다.
+# 요청문은 픽스처에 양쪽이 다 있는 것으로 고른다. 박힌 목록(app/routers/nodes.py)과
+# 설정 파일 목록(conf/settings.yaml) 이 둘 다 있어서 읽는 곳만 바꾸면 된다.
+# 없는 것을 만들어야 하는 요청을 넣으면 세션이 architectural 로 가는 것이 맞고
+# 이 케이스가 못 쓰게 된다.
 설명 = 있는 흐름을 고치는 것은 bounded
 skill = design-first
 skill먼저 = 예
