@@ -11,6 +11,7 @@
 #   --model    : 모델을 고정한다. 안 주면 설정된 기본값
 #   --turns    : 세션 최대 턴 수 (기본 30). 모자라면 답변 전에 잘린다
 #   --timeout  : 세션 하나의 제한 시간, 초 (기본 420)
+#   --jobs     : 케이스를 몇 개까지 동시에 돌릴지 (기본 1). 많이 띄우면 느려져 제한 시간에 걸린다
 #
 # exit: 0=전부 통과  1=규칙 실패 있음  2=사용법 오류 또는 세션을 못 돌림
 set -uo pipefail
@@ -19,9 +20,9 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO="$(cd "$HERE/../.." && pwd -P)"
 CASEDIR="$HERE/cases"
 
-KEEP=0; MODEL=""; TURNS=30; LIMIT=420; REPS=1; REPS_SET=0; WANT=()
+KEEP=0; MODEL=""; TURNS=30; LIMIT=420; REPS=1; REPS_SET=0; JOBS=1; WANT=()
 
-usage() { sed -n '3,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -30,6 +31,7 @@ while [ $# -gt 0 ]; do
     --model)   shift; MODEL="${1:-}" ;;
     --turns)   shift; TURNS="${1:-30}" ;;
     --timeout) shift; LIMIT="${1:-420}" ;;
+    --jobs)    shift; JOBS="${1:-1}" ;;
     -h|--help) usage; exit 0 ;;
     -*)        usage >&2; exit 2 ;;
     *)         WANT+=("$1") ;;
@@ -395,16 +397,17 @@ EOF
   fi
 }
 
-PASS=0; FAIL=0; ERR=0; FAILED=(); ERRED=()
-
-for name in "${WANT[@]}"; do
+# 케이스 하나를 REPS 번 돌리고 표시용 출력을 낸다.
+# 마지막 줄은 STATUS:pass|fail|err 로, 부모가 집계에 쓴다.
+run_case() { # <케이스이름>
+  local name="$1" txt rule desc ran verdict st
+  local ok=0 ng=0 errs="" reasons="" warns="" keeps="" rep=1 result es rs
   txt="$CASEDIR/$name.txt"; rule="$CASEDIR/$name.rule"
-  [ -f "$txt" ]  || { echo "$name  건너뜀 (프롬프트 파일 없음)"; continue; }
-  [ -f "$rule" ] || { echo "$name  건너뜀 (규칙 파일 없음)"; continue; }
-
+  if [ ! -f "$txt" ] || [ ! -f "$rule" ]; then
+    printf '%s  건너뜀 (프롬프트나 규칙 파일 없음)\n' "$name"
+    printf 'STATUS:skip\n'; return
+  fi
   desc=$(rule_get "$rule" "설명")
-  ok=0; ng=0; errs=""; reasons=""; warns=""; keeps=""
-  rep=1
   while [ "$rep" -le "$REPS" ]; do
     result=$(run_once "$name" "$rule" "$txt")
     es=$(printf '%s\n' "$result" | sed -n 's/^E://p')
@@ -424,12 +427,13 @@ for name in "${WANT[@]}"; do
   # 판정은 실제로 돌아간 횟수 기준이다. 돌리지 못한 회차는 분모에서 뺀다.
   ran=$((ok+ng))
   if [ "$ran" -eq 0 ]; then
-    verdict="돌리지 못함"
+    verdict="돌리지 못함"; st=err
   elif [ "$REPS" -eq 1 ]; then
-    [ "$ok" -eq 1 ] && verdict="통과" || verdict="실패"
+    if [ "$ok" -eq 1 ]; then verdict="통과"; st=pass; else verdict="실패"; st=fail; fi
   else
     verdict="$ok/$ran 통과"
     [ "$ran" -lt "$REPS" ] && verdict="$verdict ($((REPS-ran))회는 못 돌림)"
+    if [ "$ng" -eq 0 ]; then st=pass; else st=fail; fi
   fi
   printf '%-4s %-34s %s\n' "$name" "$desc" "$verdict"
 
@@ -439,10 +443,34 @@ for name in "${WANT[@]}"; do
   printf '%s' "$errs"    | grep -v '^$' | sort -u | sed 's/^/       세션 실패 /'
   printf '%s' "$warns"   | grep -v '^$' | sort -u | sed 's/^/       경고 /'
   printf '%s' "$keeps"   | grep -v '^$' | sed 's/^/       기록: /'
+  printf 'STATUS:%s\n' "$st"
+}
 
-  if   [ "$ran" -eq 0 ]; then ERR=$((ERR+1)); ERRED+=("$name")
-  elif [ "$ng" -eq 0 ]; then PASS=$((PASS+1))
-  else FAIL=$((FAIL+1)); FAILED+=("$name"); fi
+PASS=0; FAIL=0; ERR=0; FAILED=(); ERRED=()
+OUTD=$(mktemp -d)
+trap 'rm -rf "$OUTD"' EXIT
+
+# 케이스끼리는 샌드박스가 따로라 같이 돌려도 안 부딪힌다.
+# 다만 동시에 너무 많이 띄우면 세션이 느려져 제한 시간에 걸린다.
+if [ "$JOBS" -le 1 ]; then
+  for name in "${WANT[@]}"; do run_case "$name" >"$OUTD/$name.out" 2>&1; done
+else
+  for name in "${WANT[@]}"; do
+    while [ "$(jobs -rp | wc -l)" -ge "$JOBS" ]; do wait -n; done
+    run_case "$name" >"$OUTD/$name.out" 2>&1 &
+  done
+  wait
+fi
+
+# 낸 순서대로 보여준다. 동시에 돌아도 출력은 섞이지 않는다.
+for name in "${WANT[@]}"; do
+  [ -f "$OUTD/$name.out" ] || continue
+  sed '/^STATUS:/d' "$OUTD/$name.out"
+  case "$(sed -n 's/^STATUS://p' "$OUTD/$name.out" | tail -1)" in
+    pass) PASS=$((PASS+1)) ;;
+    fail) FAIL=$((FAIL+1)); FAILED+=("$name") ;;
+    err)  ERR=$((ERR+1));  ERRED+=("$name") ;;
+  esac
 done
 
 echo
