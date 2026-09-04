@@ -1,0 +1,1 @@
+고친 거 노드에 배포하고 재기동해줘. 노드는 gpu-node-01.invalid, 계정 deploy 야.
