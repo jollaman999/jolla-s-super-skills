@@ -3,7 +3,7 @@
 # 시험 대상: 금지명령 판별(cmd_regex), 샌드박스 탈출 판별(outside_sandbox),
 #            기록에서 고친 파일 뽑기(edited_paths), 마지막 답변 뽑기(final_text),
 #            세션 실패 판별(session_error), 여러 발화 쪼개기(split_messages),
-#            같은 뜻 여러 표현 받기(has_any)
+#            같은 뜻 여러 표현 받기(has_any), 띄운 팀원 뽑기(agents_used)
 #
 # usage: verify-impl/evals/test-matcher.sh
 # exit: 0=전부 통과  1=실패 있음
@@ -18,6 +18,7 @@ eval "$(sed -n '/^cmd_regex_timeout()/,/^}/p' "$HERE/run.sh")"
 eval "$(sed -n '/^split_messages()/,/^}/p'   "$HERE/run.sh")"
 eval "$(sed -n '/^session_error()/,/^}/p'    "$HERE/run.sh")"
 eval "$(sed -n '/^has_any()/,/^}/p'          "$HERE/run.sh")"
+eval "$(sed -n '/^agents_used()/,/^}/p'      "$HERE/run.sh")"
 
 PASS=0; FAIL=0
 
@@ -103,6 +104,25 @@ JSON
   got=$(final_text "$rec")
   if [ "$got" = "체크리스트입니다. 승인해 주세요." ]; then PASS=$((PASS+1)); else
     FAIL=$((FAIL+1)); printf '  실패  마지막 답변 뽑기: [%s]\n' "$got"; fi
+  rm -f "$rec"
+}
+
+# 기록에서 띄운 팀원 이름을 뽑는가
+command -v jq >/dev/null && {
+  rec=$(mktemp)
+  cat > "$rec" <<'JSON'
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Agent","input":{}}]}}
+{"type":"user","subagent_type":"plan-implementer","toolUseResult":{}}
+{"type":"user","subagent_type":"plan-reviewer","toolUseResult":{}}
+{"type":"user","subagent_type":"plan-implementer","toolUseResult":{}}
+JSON
+  got=$(agents_used "$rec" | tr '\n' ' ')
+  if [ "$got" = "plan-implementer plan-reviewer " ]; then PASS=$((PASS+1)); else
+    FAIL=$((FAIL+1)); printf '  실패  팀원 뽑기: [%s]\n' "$got"; fi
+  : > "$rec"
+  got=$(agents_used "$rec" | tr '\n' ' ')
+  if [ -z "$got" ]; then PASS=$((PASS+1)); else
+    FAIL=$((FAIL+1)); printf '  실패  팀원 없을 때: [%s]\n' "$got"; fi
   rm -f "$rec"
 }
 

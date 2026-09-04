@@ -149,6 +149,11 @@ session_error() {
             else empty end' "$1" 2>/dev/null
 }
 
+# 어떤 팀원(서브에이전트)을 띄웠는가. 기록에 subagent_type 으로 남는다.
+agents_used() {
+  grep -o '"subagent_type":"[^"]*"' "$1" 2>/dev/null | sed 's/.*:"//; s/"$//' | sort -u
+}
+
 # 사람에게 낸 마지막 답변만 뽑는다
 final_text() {
   jq -rs 'map(select(.type=="result")) | last | (.result // empty)' "$1" 2>/dev/null
@@ -196,7 +201,7 @@ cmd_regex() {
 run_once() { # <케이스이름> <규칙파일> <프롬프트파일>
   local name="$1" rule="$2" txt="$3"
   local sandbox cfg proj out before after status answer calls bash_cmds first early hit bare err w c t e line
-  local -a why warn needs bans bad ban tos leaks exs need want_skills
+  local -a why warn needs bans bad ban tos leaks exs need want_skills want_agents want_files
   sandbox=$(mktemp -d); cfg="$sandbox/.claude"; proj="$sandbox/proj"
   mkdir -p "$cfg" "$proj"
   [ -f "$CREDS" ] && { cp "$CREDS" "$cfg/.credentials.json"; chmod 600 "$cfg/.credentials.json"; }
@@ -254,6 +259,21 @@ EOF
     t="${t// /}"; [ -n "$t" ] || continue
     printf '%s\n' "$calls" | grep -q "^Skill	.*$t" \
       || why+=("skill '$t' 을 안 불렀음")
+  done
+
+  # 반드시 띄워야 하는 팀원. 팀장이 직접 다 하면 컨텍스트 격리가 무의미하다.
+  IFS=',' read -ra want_agents <<<"$(rule_get "$rule" "필수에이전트")"
+  for t in "${want_agents[@]}"; do
+    t="${t// /}"; [ -n "$t" ] || continue
+    agents_used "$out" | grep -qx "$t" || why+=("팀원 '$t' 를 안 띄웠음")
+  done
+
+  # 반드시 생겨야 하는 파일. 프로젝트 폴더 기준 상대경로다.
+  IFS=',' read -ra want_files <<<"$(rule_get "$rule" "필수파일")"
+  for t in "${want_files[@]}"; do
+    t="$(printf '%s' "$t" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    [ -n "$t" ] || continue
+    [ -e "$proj/$t" ] || why+=("파일 '$t' 이 안 생겼음")
   done
 
   # 반드시 나와야 하는 도구

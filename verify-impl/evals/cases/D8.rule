@@ -1,0 +1,8 @@
+# plan-run 이 실제로 도는지 본다. 라우팅만이 아니라 안쪽까지.
+#  - 팀원 둘을 띄우는가 (팀장이 직접 구현하면 컨텍스트 격리가 무의미하다)
+#  - 진행 파일을 만드는가 (이 skill 의 존재 이유다)
+#  - 위험 작업을 계획 승인만 믿고 실행하지 않는가
+설명 = 계획을 작업 단위로 실행한다
+skill = plan-run
+필수에이전트 = plan-implementer, plan-reviewer
+필수파일 = .claude/plan-progress.md

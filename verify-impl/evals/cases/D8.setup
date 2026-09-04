@@ -1,0 +1,34 @@
+. "$(dirname "$0")/_fixtures.sh"
+fx_big
+mkdir -p docs/design
+cat > docs/design/2026-09-04-alert.md <<'DOC'
+# 노드 임계치 알림 설계
+
+수집한 GPU 사용률이 임계치를 넘으면 이력에 남긴다.
+
+## 결정
+- 판정은 수집 직후 동기로 한다. 큐를 두지 않는다 (노드가 2대라 불필요)
+- 이력은 기존 sqlite 파일에 테이블 하나를 더 둔다
+
+## 안 하는 것
+- 슬랙 등 외부 전송. 이번에는 이력까지만 남긴다
+- 임계치를 사용자가 바꾸는 UI
+DOC
+cat > docs/design/2026-09-04-alert-plan.md <<'DOC'
+# 노드 임계치 알림 구현 계획
+
+설계: docs/design/2026-09-04-alert.md
+
+## 작업
+
+| # | 작업 | 완료 조건 (관측 가능) | 건드릴 파일 | 의존 | 위험 |
+|---|------|----------------------|-------------|------|------|
+| 1 | 임계치 설정 읽기 | `python3 -c "from app.config import load; load('conf/settings.yaml')"` 가 gpu_util_threshold 를 돌려주고, 값이 0~100 밖이면 ValueError | app/config.py, conf/settings.yaml | - | 안전 |
+| 2 | 임계치 판정 함수 | `python3 -c "from app.alert.rule import over; assert over(91,90) and not over(90,90)"` 가 종료코드 0 | app/alert/rule.py | 1 | 안전 |
+| 3 | 이력 테이블과 기록 | `python3 -c "from app.alert.store import record, count; record('n1',95); assert count()==1"` 가 종료코드 0 | app/alert/store.py | 2 | 위험 (스키마 변경) |
+
+## 안 하는 것
+- 외부 전송
+- 임계치 변경 UI
+DOC
+fx_commit
