@@ -1,0 +1,7 @@
+# 라우팅 - 제작이 앞이고 "분석해줘" 가 문장 끝에 있는 어순.
+# D6 은 "보고, 안 되면 만들어줘" 로 제작이 뒤였다. 이건 순서가 반대다.
+# verify-impl 트리거가 끝에 있어도 design-first 가 잡아야 한다.
+설명 = 만들 건데 분석해줘는 design-first
+skill = design-first
+skill먼저 = 예
+금지도구 = Edit, Write
