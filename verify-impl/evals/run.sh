@@ -105,11 +105,16 @@ run_session() { # <프롬프트파일> <proj> <cfg> <out>
   done < <(split_messages "$txt")
 }
 
+# 도구 호출 하나가 TSV 한 줄이어야 해서 명령 안의 줄바꿈을 이 표식으로 바꿔 둔다.
+# 공백으로 눌러버리면 줄 구조가 사라져 heredoc 본문을 못 가려낸다.
+# 탭은 TSV 구분자라 못 쓰고, 눈에 보이는 문자는 명령 본문에 그대로 나올 수 있어 못 쓴다.
+NLMARK=$'\001'
+
 # stream-json 에서 도구 호출만 순서대로 뽑는다
 tool_calls() {
-  jq -r 'select(.type=="assistant") | .message.content[]?
+  jq -r --arg nl "$NLMARK" 'select(.type=="assistant") | .message.content[]?
          | select(.type=="tool_use")
-         | [.name, ((.input.command // .input.file_path // .input.skill // .input.prompt // "") | tostring | gsub("\n";" "))]
+         | [.name, ((.input.command // .input.file_path // .input.skill // .input.prompt // "") | tostring | gsub("\n";$nl))]
          | @tsv' "$1" 2>/dev/null
 }
 
@@ -198,26 +203,44 @@ cmd_regex() {
 
 # heredoc 본문은 파일에 적어 넣는 글이지 실행이 아니다. 판정 전에 떼어낸다.
 # 진행 파일에 "scp ... 로 배포한다" 를 적은 것을 scp 실행으로 세던 오탐 때문이다.
-# 기록에는 줄바꿈이 공백으로 바뀌어 오므로, 여는 <<DELIM 부터 공백으로 둘러싸인
-# DELIM 까지를 본문으로 본다. 따옴표 유무와 <<- 와 구분자 이름은 임의로 온다.
+# 줄바꿈은 $NLMARK 로 남아 있으니 셸과 같은 규칙을 쓴다. 여는 <<DELIM 다음 줄부터
+# 구분자만 있는 줄까지를 버리고, 여는 줄에서는 <<DELIM 토큰만 뗀다.
+# 구분자가 본문 중간에 문장의 일부로 나와도 거기서 안 끊긴다.
+# 따옴표 유무와 <<- 와 구분자 이름은 임의로 온다.
+# 한 줄에서 <<A <<B 처럼 여럿이 열리면 본문도 그 순서로 온다.
 # 닫는 말이 없으면 (잘린 기록) 뒤쪽 전부가 본문이다.
 # <<< 는 히어스트링이라 본문이 없으므로 건드리지 않는다.
 strip_heredoc() {
-  awk '
+  awk -v nl="$NLMARK" '
   {
-    line = $0; out = ""
-    while (match(line, /(^|[^<])<<-?[ \t]*(\047[A-Za-z_][A-Za-z0-9_]*\047|"[A-Za-z_][A-Za-z0-9_]*"|[A-Za-z_][A-Za-z0-9_]*)/)) {
-      mt = substr(line, RSTART, RLENGTH)
-      p = index(mt, "<<")
-      out = out substr(line, 1, RSTART - 1) substr(mt, 1, p - 1) " "
-      d = substr(mt, p + 2)
-      sub(/^-/, "", d); sub(/^[ \t]*/, "", d); gsub(/\047|"/, "", d)
-      line = substr(line, RSTART + RLENGTH)
-      if (match(line, "(^|[ \t])" d "([ \t]|$)"))
-        line = " " substr(line, RSTART + RLENGTH)
-      else { line = ""; break }
+    n = split($0, seg, nl)
+    out = ""; kept = 0; open = 0
+    for (i = 1; i <= n; i++) {
+      line = seg[i]
+      # 본문 안이면 닫는 줄을 찾을 때까지 통째로 버린다.
+      # <<- 는 선행 탭을 허용하므로 앞뒤 공백은 떼고 비교한다.
+      if (open > 0) {
+        t = line
+        sub(/^[ \t]+/, "", t); sub(/[ \t]+$/, "", t)
+        if (t == delim[1]) {
+          for (j = 1; j < open; j++) delim[j] = delim[j+1]
+          open--
+        }
+        continue
+      }
+      head = ""
+      while (match(line, /(^|[^<])<<-?[ \t]*(\047[A-Za-z_][A-Za-z0-9_]*\047|"[A-Za-z_][A-Za-z0-9_]*"|[A-Za-z_][A-Za-z0-9_]*)/)) {
+        mt = substr(line, RSTART, RLENGTH)
+        p = index(mt, "<<")
+        head = head substr(line, 1, RSTART - 1) substr(mt, 1, p - 1) " "
+        d = substr(mt, p + 2)
+        sub(/^-/, "", d); sub(/^[ \t]*/, "", d); gsub(/\047|"/, "", d)
+        open++; delim[open] = d
+        line = substr(line, RSTART + RLENGTH)
+      }
+      out = out (kept++ ? nl : "") head line
     }
-    print out line
+    print out
   }'
 }
 
@@ -330,7 +353,8 @@ EOF
     while IFS= read -r line; do
       [ -n "$line" ] || continue
       is_exempt "$line" && continue
-      why+=("$t 를 썼음: $(printf '%s' "${line#*	}" | cut -c1-60)")
+      # 표식이 사람에게 보이는 문구로 새어 나가면 안 된다
+      why+=("$t 를 썼음: $(printf '%s' "${line#*	}" | tr "$NLMARK" ' ' | cut -c1-60)")
       break
     done <<EOF
 $(printf '%s\n' "$calls" | grep "^$t	")
@@ -340,8 +364,10 @@ EOF
   # 나오면 안 되는 명령. 실제로 그 명령을 실행했을 때만 잡는다.
   # ls ~/.ssh 나 grep "ssh config" 처럼 이름만 스쳐가는 것은 위반이 아니다.
   # heredoc 본문에 인용된 것도 실행이 아니라서 여기서 미리 떼어낸다.
+  # 본문을 뗀 뒤 표식을 진짜 줄바꿈으로 되돌린다. cmd_regex 가 줄 맨 앞을 앵커로
+  # 쓰기 때문에, 표식을 그대로 두면 heredoc 뒤에 이어진 명령을 못 잡는다.
   bash_cmds=$(printf '%s\n' "$calls" | awk -F'\t' '$1=="Bash"{ $1=""; sub(/^\t/,""); print }' \
-              | strip_heredoc)
+              | strip_heredoc | tr "$NLMARK" '\n')
   IFS=',' read -ra bad <<<"$(rule_get "$rule" "금지명령")"
   for c in "${bad[@]}"; do
     c="$(printf '%s' "$c" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
