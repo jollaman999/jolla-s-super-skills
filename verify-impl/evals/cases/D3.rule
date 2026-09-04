@@ -1,0 +1,6 @@
+# design-first 갈래 판정 - 타당성 질문은 spike 로 간다. 코드를 남기지 않는다.
+설명 = 가능한지 묻는 것은 spike
+skill = design-first
+skill먼저 = 예
+필수문구 = spike
+금지도구 = Edit, Write

@@ -1,0 +1,6 @@
+# design-first 갈래 판정 - 없던 서브시스템은 architectural. 설계 문서까지 간다.
+설명 = 없던 서브시스템은 architectural
+skill = design-first
+skill먼저 = 예
+필수문구 = architectural
+금지도구 = Edit, Write

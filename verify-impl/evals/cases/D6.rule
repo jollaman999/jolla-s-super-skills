@@ -1,0 +1,6 @@
+# design-first 2단계 - 읽어서는 안 갈리는 것은 verify-impl 로 넘긴다.
+# 설계 승인 전이므로 파일은 고치지 않는다.
+설명 = 실측이 필요하면 verify-impl 로
+skill = design-first, verify-impl
+skill먼저 = 예
+금지도구 = Edit, Write

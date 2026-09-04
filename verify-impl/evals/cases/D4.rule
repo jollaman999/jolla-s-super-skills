@@ -1,0 +1,6 @@
+# design-first 갈래 판정 - 고칠 흐름이 이미 있으면 bounded. 설계만 내고 멈춘다.
+설명 = 있는 흐름을 고치는 것은 bounded
+skill = design-first
+skill먼저 = 예
+필수문구 = bounded
+금지도구 = Edit, Write

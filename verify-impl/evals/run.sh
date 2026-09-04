@@ -196,7 +196,7 @@ cmd_regex() {
 run_once() { # <케이스이름> <규칙파일> <프롬프트파일>
   local name="$1" rule="$2" txt="$3"
   local sandbox cfg proj out before after status answer calls bash_cmds first early hit bare err w c t e line
-  local -a why warn needs bans bad ban tos leaks exs need
+  local -a why warn needs bans bad ban tos leaks exs need want_skills
   sandbox=$(mktemp -d); cfg="$sandbox/.claude"; proj="$sandbox/proj"
   mkdir -p "$cfg" "$proj"
   [ -f "$CREDS" ] && { cp "$CREDS" "$cfg/.credentials.json"; chmod 600 "$cfg/.credentials.json"; }
@@ -207,6 +207,14 @@ run_once() { # <케이스이름> <규칙파일> <프롬프트파일>
   # 케이스가 가짜 프로젝트를 요구하면 만들어 둔다
   ( cd "$proj" && git init -q ) 2>/dev/null
   [ -f "$CASEDIR/$name.setup" ] && ( cd "$proj" && bash "$CASEDIR/$name.setup" ) >/dev/null 2>&1
+
+  # 슬래시로 시작하는 발화는 Claude Code 가 슬래시 명령으로 먹는다.
+  # "Unknown command: /nodes" 만 돌아오고 규칙은 시험되지도 않는다.
+  if split_messages "$txt" | tr '\0' '\n' | grep -q '^/'; then
+    printf 'E:프롬프트가 / 로 시작합니다. 슬래시 명령으로 먹히니 문장을 바꾸세요\n'
+    rm -rf "$sandbox"
+    return
+  fi
 
   out="$sandbox/out.json"
   before=$(git -C "$REPO" status --porcelain 2>/dev/null | sort)
@@ -240,11 +248,13 @@ EOF
   [ "$before" != "$after" ] && warn+=("repo 워킹트리가 바뀜. 이 세션인지 다른 세션인지 확인 필요")
 
   # 반드시 나와야 하는 skill
-  want_skill=$(rule_get "$rule" "skill")
-  if [ -n "$want_skill" ]; then
-    printf '%s\n' "$calls" | grep -q "^Skill	.*$want_skill" \
-      || why+=("skill '$want_skill' 을 안 불렀음")
-  fi
+  # 쉼표로 여러 개를 적으면 전부 불려야 한다. skill 이 skill 을 부르는 연계를 본다.
+  IFS=',' read -ra want_skills <<<"$(rule_get "$rule" "skill")"
+  for t in "${want_skills[@]}"; do
+    t="${t// /}"; [ -n "$t" ] || continue
+    printf '%s\n' "$calls" | grep -q "^Skill	.*$t" \
+      || why+=("skill '$t' 을 안 불렀음")
+  done
 
   # 반드시 나와야 하는 도구
   IFS=',' read -ra need <<<"$(rule_get "$rule" "필수도구")"
