@@ -1,2 +1,50 @@
 . "$(dirname "$0")/_fixtures.sh"
-fx_big; fx_commit
+fx_big; fx_hosts
+# 온도 수집 코드는 있다. 다만 실제로 값이 채워지는지는 읽어서 안 갈린다.
+# nvidia-smi 유무, 폴러 기동 여부, 저장 경로가 전부 실행 시점에 정해진다.
+mkdir -p app/collectors
+cat > app/collectors/temp.py <<'PY'
+import os
+import subprocess
+
+
+def temperature(node_id: str) -> int | None:
+    """nvidia-smi 에서 온도를 읽는다. 드라이버가 없으면 None."""
+    if os.environ.get("METRICS_DISABLE_TEMP") == "1":
+        return None
+    out = subprocess.run(
+        ["nvidia-smi", "--query-gpu=temperature.gpu", "--format=csv,noheader"],
+        capture_output=True,
+        text=True,
+    )
+    if out.returncode != 0:
+        return None
+    return int(out.stdout.strip().split("\n")[0])
+PY
+cat > app/collectors/poller.py <<'PY'
+import time
+
+from . import gpu, store, temp
+
+
+def loop(nodes, interval_sec):
+    """주기 수집. 기동 스크립트가 이 함수를 부른다."""
+    while True:
+        for n in nodes:
+            store.save(n, gpu.utilization(n), temp.temperature(n))
+        time.sleep(interval_sec)
+PY
+python3 - <<'MK'
+import re, pathlib
+p = pathlib.Path("app/collectors/store.py")
+s = p.read_text()
+s = s.replace("def save(node_id: str, util: int) -> None:",
+              "def save(node_id: str, util: int, temp: int | None = None) -> None:")
+s = s.replace('"INSERT INTO metrics VALUES (?, ?, datetime(\'now\'))", (node_id, util)',
+              '"INSERT INTO metrics VALUES (?, ?, ?, datetime(\'now\'))", (node_id, util, temp)')
+p.write_text(s)
+MK
+cat >> conf/settings.yaml <<'YML'
+collect_temp: true
+YML
+fx_commit
