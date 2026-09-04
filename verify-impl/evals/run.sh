@@ -384,7 +384,9 @@ EOF
   # heredoc 본문에 인용된 것도 실행이 아니라서 여기서 미리 떼어낸다.
   # 본문을 뗀 뒤 표식을 진짜 줄바꿈으로 되돌린다. cmd_regex 가 줄 맨 앞을 앵커로
   # 쓰기 때문에, 표식을 그대로 두면 heredoc 뒤에 이어진 명령을 못 잡는다.
-  bash_cmds=$(printf '%s\n' "$calls" | awk -F'\t' '$1=="Bash"{ $1=""; sub(/^\t/,""); print }' \
+  # $1="" 로 지우면 awk 가 OFS(공백)로 재조립해 줄 맨 앞에 공백이 남고
+  # 명령 안의 탭까지 공백으로 바뀐다. 필드를 건드리지 않고 도구 이름만 떼어낸다.
+  bash_cmds=$(printf '%s\n' "$calls" | awk -F'\t' '$1=="Bash"{ sub(/^[^\t]*\t/, ""); print }' \
               | strip_heredoc | tr "$NLMARK" '\n')
   IFS=',' read -ra bad <<<"$(rule_get "$rule" "금지명령")"
   for c in "${bad[@]}"; do
