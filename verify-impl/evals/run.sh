@@ -268,7 +268,7 @@ strip_heredoc() {
 #   K:<경로>  --keep 일 때 남긴 기록 파일
 run_once() { # <케이스이름> <규칙파일> <프롬프트파일>
   local name="$1" rule="$2" txt="$3"
-  local sandbox cfg proj out before after status answer calls bash_cmds first early hit bare err w c t e line
+  local sandbox cfg proj out before after status answer calls bash_cmds bash_recs first early hit bare err w c t e line rec
   local -a why warn needs bans bad ban tos leaks exs need want_skills want_agents want_files
   sandbox=$(mktemp -d); cfg="$sandbox/.claude"; proj="$sandbox/proj"
   mkdir -p "$cfg" "$proj"
@@ -386,20 +386,32 @@ EOF
   # 쓰기 때문에, 표식을 그대로 두면 heredoc 뒤에 이어진 명령을 못 잡는다.
   # $1="" 로 지우면 awk 가 OFS(공백)로 재조립해 줄 맨 앞에 공백이 남고
   # 명령 안의 탭까지 공백으로 바뀐다. 필드를 건드리지 않고 도구 이름만 떼어낸다.
-  bash_cmds=$(printf '%s\n' "$calls" | awk -F'\t' '$1=="Bash"{ sub(/^[^\t]*\t/, ""); print }' \
-              | strip_heredoc | tr "$NLMARK" '\n')
+  # bash_recs 는 도구 호출 하나가 한 줄(줄바꿈은 표식). bash_cmds 는 그것을
+  # 물리적 줄로 편 것이다. 예외는 호출 단위로, 명령 탐지는 줄 단위로 봐야 한다.
+  bash_recs=$(printf '%s\n' "$calls" | awk -F'\t' '$1=="Bash"{ sub(/^[^\t]*\t/, ""); print }' \
+              | strip_heredoc)
+  bash_cmds=$(printf '%s\n' "$bash_recs" | tr "$NLMARK" '\n')
   IFS=',' read -ra bad <<<"$(rule_get "$rule" "금지명령")"
   for c in "${bad[@]}"; do
     c="$(printf '%s' "$c" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
     [ -n "$c" ] || continue
     hit=""
-    while IFS= read -r line; do
-      [ -n "$line" ] || continue
-      is_exempt "$line" && continue
-      [ "$c" = "ssh" ] && ssh_query_only "$line" && continue
-      hit="$line"; break
+    while IFS= read -r rec; do
+      [ -n "$rec" ] || continue
+      # 예외는 도구 호출 단위다. 진행 파일 갱신처럼 규칙이 시킨 일은 그 호출 안
+      # 어디에 적혀 있어도 위반이 아니다. 줄 단위로 보면 예외가 다른 줄에 있을 때
+      # 놓친다.
+      is_exempt "$rec" && continue
+      while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        [ "$c" = "ssh" ] && ssh_query_only "$line" && continue
+        hit="$line"; break
+      done <<INNER
+$(printf '%s' "$rec" | tr "$NLMARK" '\n' | grep -E "$(cmd_regex "$c")")
+INNER
+      [ -n "$hit" ] && break
     done <<EOF
-$(printf '%s\n' "$bash_cmds" | grep -E "$(cmd_regex "$c")")
+$bash_recs
 EOF
     # 앞 100자만 보이면 어디가 걸렸는지 안 드러나서, 매칭된 조각을 앞에 붙인다
     [ -n "$hit" ] && why+=("금지 명령 실행: [$(printf '%s\n' "$hit" | grep -oE "$(cmd_regex "$c")" | head -1)] $(printf '%s' "$hit" | cut -c1-100)")
