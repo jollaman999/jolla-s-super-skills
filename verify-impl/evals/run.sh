@@ -106,6 +106,8 @@ run_session() { # <프롬프트파일> <proj> <cfg> <out>
 }
 
 # 도구 호출 하나가 TSV 한 줄이어야 해서 명령 안의 줄바꿈을 이 표식으로 바꿔 둔다.
+# 명령에 이미 이 바이트가 들어 있으면 줄이 잘못 쪼개져 heredoc 판정이 깨지므로,
+# 바꾸기 전에 먼저 지운다. 셸 명령에 나올 이유가 없는 바이트라 지워도 잃는 것이 없다.
 # 공백으로 눌러버리면 줄 구조가 사라져 heredoc 본문을 못 가려낸다.
 # 탭은 TSV 구분자라 못 쓰고, 눈에 보이는 문자는 명령 본문에 그대로 나올 수 있어 못 쓴다.
 NLMARK=$'\001'
@@ -114,7 +116,7 @@ NLMARK=$'\001'
 tool_calls() {
   jq -r --arg nl "$NLMARK" 'select(.type=="assistant") | .message.content[]?
          | select(.type=="tool_use")
-         | [.name, ((.input.command // .input.file_path // .input.skill // .input.prompt // "") | tostring | gsub("\n";$nl))]
+         | [.name, ((.input.command // .input.file_path // .input.skill // .input.prompt // "") | tostring | gsub($nl;"") | gsub("\n";$nl))]
          | @tsv' "$1" 2>/dev/null | untsv
 }
 
