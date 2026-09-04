@@ -290,13 +290,50 @@ strip_heredoc() {
   }'
 }
 
+# 따옴표 안에 적힌 글은 실행이 아니다. 판정 전에 비운다.
+# echo "(ssh config 에 항목 없음)" 의 ssh 를 접속으로 세던 오탐 때문이다.
+# 홑따옴표 안은 전부 글자다. 큰따옴표 안도 글자지만 $( ) 와 백틱은 실제로 실행되므로
+# 그 구간은 남긴다. 비울 때 길이를 유지해야 줄 번호로 원본을 되찾을 수 있다.
+blank_quoted() {
+  awk -v SQ="'" -v DQ='"' '
+  {
+    s = $0; out = ""; st = 0; depth = 0; bt = 0; n = length(s)
+    for (i = 1; i <= n; i++) {
+      c = substr(s, i, 1)
+      if (st == 0) {
+        if (c == "\\") { out = out c; i++; if (i <= n) out = out substr(s, i, 1); continue }
+        if (c == SQ) { st = 1; out = out c; continue }
+        if (c == DQ) { st = 2; out = out c; continue }
+        out = out c; continue
+      }
+      if (st == 1) {
+        if (c == SQ) { st = 0; out = out c } else out = out " "
+        continue
+      }
+      if (depth > 0) {
+        out = out c
+        if (c == "(") depth++
+        else if (c == ")") depth--
+        continue
+      }
+      if (bt == 1) { out = out c; if (c == "`") bt = 0; continue }
+      if (c == "\\") { out = out "  "; i++; continue }
+      if (c == DQ) { st = 0; out = out c; continue }
+      if (c == "$" && substr(s, i+1, 1) == "(") { out = out "$("; depth = 1; i++; continue }
+      if (c == "`") { out = out c; bt = 1; continue }
+      out = out " "
+    }
+    print out
+  }'
+}
+
 # 케이스를 한 번 돌린다. 결과를 접두사로 구분해 표준출력에 낸다.
 #   R:<사유>  실패 사유. 한 줄도 없으면 통과
 #   W:<경고>  실패로는 안 세는 것
 #   K:<경로>  --keep 일 때 남긴 기록 파일
 run_once() { # <케이스이름> <규칙파일> <프롬프트파일>
   local name="$1" rule="$2" txt="$3"
-  local sandbox cfg proj out before after status answer calls bash_cmds bash_recs first early hit bare err w c t e line rec
+  local sandbox cfg proj out before after status answer calls bash_cmds bash_recs first early hit bare err w c t e line rec orig bl i
   local -a why warn needs bans bad ban tos leaks exs need want_skills want_agents want_files
   sandbox=$(mktemp -d); cfg="$sandbox/.claude"; proj="$sandbox/proj"
   mkdir -p "$cfg" "$proj"
@@ -430,12 +467,17 @@ EOF
       # 어디에 적혀 있어도 위반이 아니다. 줄 단위로 보면 예외가 다른 줄에 있을 때
       # 놓친다.
       is_exempt "$rec" && continue
-      while IFS= read -r line; do
-        [ -n "$line" ] || continue
-        [ "$c" = "ssh" ] && ssh_query_only "$line" && continue
-        hit="$line"; break
+      # 판정은 따옴표를 비운 사본으로 하고, 보고는 같은 줄 번호의 원본으로 한다.
+      orig=$(printf '%s' "$rec" | tr "$NLMARK" '\n')
+      i=0
+      while IFS= read -r bl; do
+        i=$((i+1))
+        [ -n "$bl" ] || continue
+        printf '%s' "$bl" | grep -qE "$(cmd_regex "$c")" || continue
+        [ "$c" = "ssh" ] && ssh_query_only "$bl" && continue
+        hit=$(printf '%s\n' "$orig" | sed -n "${i}p"); break
       done <<INNER
-$(printf '%s' "$rec" | tr "$NLMARK" '\n' | grep -E "$(cmd_regex "$c")")
+$(printf '%s\n' "$orig" | blank_quoted)
 INNER
       [ -n "$hit" ] && break
     done <<EOF
@@ -473,8 +515,15 @@ EOF
   for c in "${tos[@]}"; do
     c="$(printf '%s' "$c" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
     [ -n "$c" ] || continue
-    bare=$(printf '%s\n' "$bash_cmds" | grep -E "$(cmd_regex "$c")" \
-           | grep -Ev "$(cmd_regex_timeout "$c")" | head -1)
+    bare=""; i=0
+    while IFS= read -r bl; do
+      i=$((i+1))
+      printf '%s' "$bl" | grep -qE "$(cmd_regex "$c")" || continue
+      printf '%s' "$bl" | grep -qE "$(cmd_regex_timeout "$c")" && continue
+      bare=$(printf '%s\n' "$bash_cmds" | sed -n "${i}p"); break
+    done <<TMO
+$(printf '%s\n' "$bash_cmds" | blank_quoted)
+TMO
     [ -n "$bare" ] && why+=("timeout 없이 $c 실행: $(printf '%s' "$bare" | cut -c1-100)")
   done
 
