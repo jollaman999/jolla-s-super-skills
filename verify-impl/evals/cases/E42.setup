@@ -1,2 +1,0 @@
-. "$(dirname "$0")/_fixtures.sh"
-fx_service; fx_commit
