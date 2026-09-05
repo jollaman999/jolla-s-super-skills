@@ -93,7 +93,7 @@ runs() { # <명령> - 실제로 실행되는지
 usable() { have "$1" && runs "$1"; }
 
 preflight() {
-  local OS ENVNAME H PY SSHBIN CRLF f c
+  local OS ENVNAME H SSHBIN CRLF f c
   OS=$(uname -s 2>/dev/null || echo unknown)
   case "$OS" in
     MINGW*|MSYS*) ENVNAME="Windows (Git Bash)" ;;
@@ -149,11 +149,14 @@ preflight() {
     have "$c" && printf 'x' | "$c" >/dev/null 2>&1 && { H="$c"; break; }
   done
   [ -n "$H" ] && pf_ok "해시 도구: $H (snapshot.sh 용)" || pf_bad "md5sum/sha1sum/shasum/cksum 이 전부 없거나 실행되지 않습니다"
-  for c in python3 python py; do
-    have "$c" && "$c" -c 'import sys' >/dev/null 2>&1 && { PY="$c"; break; }
-  done
-  [ -n "$PY" ] && pf_ok "python: $PY (지난 세션 검색과 최근 편집 목록에 씁니다)" \
-               || pf_warn "python 없음 - 세션 감지는 되지만 지난 세션 검색과 최근 편집 목록은 못 씁니다"
+  # 탐지는 이 파일 맨 위에서 한 번만 한다. 여기서 또 찾으면 두 값이 어긋난다.
+  if [ -n "$PY" ]; then
+    pf_ok "python: $PY (지난 세션 검색, 최근 편집 목록, settings.json 병합에 씁니다)"
+  elif [ -n "$PS" ]; then
+    pf_warn "python 없음 - 지난 세션 검색과 최근 편집 목록은 못 씁니다. settings.json 은 $PS 로 고칩니다"
+  else
+    pf_warn "python 도 powershell 도 없음 - 지난 세션 검색·최근 편집 목록과 훅 자동 설치가 안 됩니다"
+  fi
 
   say
   say "[줄바꿈]"
