@@ -30,6 +30,11 @@ PY=""
 for _c in python3 python py; do
   command -v "$_c" >/dev/null 2>&1 && "$_c" -c 'import sys' >/dev/null 2>&1 && { PY="$_c"; break; }
 done
+# Windows(Git Bash)에는 python 이 없을 수 있다. 거기서는 PowerShell 이 항상 있다.
+PS=""
+[ -n "$PY" ] || for _c in powershell.exe pwsh.exe pwsh; do
+  command -v "$_c" >/dev/null 2>&1 && { PS="$_c"; break; }
+done
 
 SCOPE=""; PROJDIR=""; MODE=""
 FORCE=0; DRY=0; UNINSTALL=0; YES=0; CHECK=0
@@ -247,9 +252,15 @@ hook_cmd() { # <설치위치>
   printf 'S="%s/skills/shared/scripts/check-install.sh"; if [ -x "$S" ]; then "$S" --quiet "%s" || true; else echo "skills 설치가 깨졌습니다: 검사 스크립트에 닿지 못합니다 (%s/skills/shared). repo 를 옮겼거나 지웠는지 보세요"; fi; exit 0' "$1" "$1" "$1"
 }
 
-# python 이 없으면 JSON 을 안전하게 병합할 수 없다. 그때는 2 를 내고 부르는 쪽이 안내한다.
+# JSON 을 손으로 자르지 않는다. settings.json 은 사용자 파일이고 남의 훅이 들어 있을 수 있다.
+# 쓸 도구가 없으면 2 를 내고 부르는 쪽이 안내만 한다. 조용히 틀리지 않는다.
 hook_edit() { # <settings.json> <add|remove> [명령]
-  [ -n "$PY" ] || return 2
+  if   [ -n "$PY" ]; then hook_edit_py "$@"
+  elif [ -n "$PS" ]; then hook_edit_ps "$@"
+  else return 2; fi
+}
+
+hook_edit_py() { # <settings.json> <add|remove> [명령]
   "$PY" - "$1" "$2" "${3:-}" <<'PYJSON'
 import json, os, sys
 path, op, cmd = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -287,6 +298,93 @@ os.replace(tmp, path)
 PYJSON
 }
 
+# PowerShell 판. Windows 에서 시험하지 못했다. 그래서 쓰고 나서 스스로 확인하고,
+# 이상하면 원본으로 되돌린 뒤 실패를 낸다. 부르는 쪽은 그때 안내만 하게 된다.
+hook_edit_ps() { # <settings.json> <add|remove> [명령]
+  local json="$1" op="$2" cmd="${3:-}" ps1 wj wp rc
+  ps1=$(mktemp --suffix=.ps1 2>/dev/null || mktemp) || return 2
+  cat > "$ps1" <<'PS1EOF'
+param([string]$Path, [string]$Op, [string]$Cmd)
+$ErrorActionPreference = 'Stop'
+$MARK = 'check-install.sh'
+$bak  = "$Path.jolla-bak"
+try {
+  if (Test-Path -LiteralPath $Path) {
+    Copy-Item -LiteralPath $Path -Destination $bak -Force
+    $raw = Get-Content -LiteralPath $Path -Raw
+    if ($raw.Trim().Length -eq 0) { $cfg = New-Object PSObject }
+    else { $cfg = $raw | ConvertFrom-Json }
+  } else { $cfg = New-Object PSObject }
+} catch { exit 3 }
+
+function Has($o, $n) { return ($o.PSObject.Properties.Name -contains $n) }
+if (-not (Has $cfg 'hooks')) { $cfg | Add-Member -NotePropertyName hooks -NotePropertyValue (New-Object PSObject) }
+$hooks = $cfg.hooks
+$list = @()
+if ((Has $hooks 'SessionStart') -and $hooks.SessionStart) { $list = @($hooks.SessionStart) }
+
+$kept = New-Object System.Collections.ArrayList
+foreach ($e in $list) {
+  $mine = $false
+  if ($e -and (Has $e 'hooks')) {
+    foreach ($h in @($e.hooks)) { if ($h -and $h.command -and $h.command.Contains($MARK)) { $mine = $true } }
+  }
+  if (-not $mine) { [void]$kept.Add($e) }
+}
+if ($Op -eq 'add') {
+  $inner = New-Object PSObject
+  $inner | Add-Member -NotePropertyName type    -NotePropertyValue 'command'
+  $inner | Add-Member -NotePropertyName command -NotePropertyValue $Cmd
+  $inner | Add-Member -NotePropertyName timeout -NotePropertyValue 5
+  $entry = New-Object PSObject
+  $entry | Add-Member -NotePropertyName matcher -NotePropertyValue ''
+  $entry | Add-Member -NotePropertyName hooks   -NotePropertyValue @($inner)
+  [void]$kept.Add($entry)
+}
+if ($kept.Count -gt 0) {
+  $arr = [object[]]$kept.ToArray()
+  if (Has $hooks 'SessionStart') { $hooks.SessionStart = $arr }
+  else { $hooks | Add-Member -NotePropertyName SessionStart -NotePropertyValue $arr }
+} elseif (Has $hooks 'SessionStart') { $hooks.PSObject.Properties.Remove('SessionStart') }
+if ($hooks.PSObject.Properties.Name.Count -eq 0) { $cfg.PSObject.Properties.Remove('hooks') }
+
+$tmp = "$Path.tmp"
+try {
+  $json = $cfg | ConvertTo-Json -Depth 20
+  [IO.File]::WriteAllText($tmp, $json + [Environment]::NewLine, (New-Object Text.UTF8Encoding($false)))
+  Move-Item -LiteralPath $tmp -Destination $Path -Force
+} catch { if (Test-Path -LiteralPath $bak) { Move-Item -LiteralPath $bak -Destination $Path -Force }; exit 3 }
+
+# 쓰고 나서 확인한다. 시험하지 못한 경로라 결과를 믿지 않는다.
+$ok = $false
+try {
+  $back = Get-Content -LiteralPath $Path -Raw
+  $null = $back | ConvertFrom-Json
+  $hasMark  = $back.Contains($MARK)
+  $isArray  = ($back -match '"SessionStart"\s*:\s*\[')
+  if ($Op -eq 'add')    { $ok = ($hasMark -and $isArray) }
+  else                  { $ok = (-not $hasMark) }
+} catch { $ok = $false }
+if (-not $ok) {
+  if (Test-Path -LiteralPath $bak) { Move-Item -LiteralPath $bak -Destination $Path -Force }
+  else { Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue }
+  exit 4
+}
+Remove-Item -LiteralPath $bak -Force -ErrorAction SilentlyContinue
+exit 0
+PS1EOF
+  # Git Bash 경로는 PowerShell 이 못 읽는다. cygpath 가 있으면 바꿔서 넘긴다.
+  if command -v cygpath >/dev/null 2>&1; then
+    wj=$(cygpath -w "$json"); wp=$(cygpath -w "$ps1")
+  else
+    wj="$json"; wp="$ps1"
+  fi
+  "$PS" -NoProfile -ExecutionPolicy Bypass -File "$wp" -Path "$wj" -Op "$op" -Cmd "$cmd"
+  rc=$?
+  rm -f "$ps1"
+  return "$rc"
+}
+
 # --- 해제 ---
 # 기록(manifest)이 있으면 거기 적힌 것만 지운다. 없으면 예전 방식대로 링크만 본다.
 if [ "$UNINSTALL" -eq 1 ]; then
@@ -318,7 +416,7 @@ if [ "$UNINSTALL" -eq 1 ]; then
     if grep -qxF "hook=SessionStart" "$MANIFEST" 2>/dev/null; then
       if [ "$DRY" -eq 1 ]; then say "  제거   settings.json 의 SessionStart 훅"
       elif hook_edit "$DEST/settings.json" remove; then say "  제거   settings.json 의 SessionStart 훅"
-      else say "  건너뜀 settings.json 의 SessionStart 훅  (python 없음 또는 읽을 수 없음). 직접 지우세요"; fi
+      else say "  건너뜀 settings.json 의 SessionStart 훅  (고칠 도구가 없거나 읽을 수 없음). 직접 지우세요"; fi
     fi
     run rm -f "$MANIFEST"
     # 비게 된 디렉터리만 정리한다. rmdir 은 비지 않은 것은 건드리지 않는다.
@@ -518,21 +616,27 @@ else
   say "설치가 깨졌는지 세션 시작 때 알려주는 훅을 걸 수 있습니다."
   say "  하는 일: 설치한 ${#PLACED[@]}개가 살아 있는지 본다. 0초, 네트워크 없음, 읽기만"
   say "  깨졌을 때만 말하고 정상이면 아무 말도 안 합니다"
-  if [ -z "$PY" ]; then
+  if [ -z "$PY" ] && [ -z "$PS" ]; then
     say
-    say "  python 이 없어 $SET 을 안전하게 고칠 수 없습니다. 직접 넣으세요:"
+    say "  python 도 powershell 도 없어 $SET 을 안전하게 고칠 수 없습니다. 직접 넣으세요:"
     say "  hooks.SessionStart 에 type=command 로:"
     say "    $(hook_cmd "$DEST")"
+  elif ! ask; then
+    # 물어볼 수가 없어서 안 넣은 것이지 거절한 것이 아니다. 둘을 가려서 말한다.
+    say
+    if [ "$YES" -eq 1 ]; then say "  --yes 라 묻지 않고 건너뛰었습니다."
+    else                      say "  터미널이 아니라 물어볼 수 없어 건너뛰었습니다."; fi
+    say "  걸려면 터미널에서: $0 $([ "$SCOPE" = project ] && echo "--project $PROJDIR ")"
   else
     a=y
-    if ask; then printf '%s' "  $SET 에 넣을까요? [Y/n]: "; read -r a || a=""; else a=n; fi
+    printf '%s' "  $SET 에 넣을까요? [Y/n]: "; read -r a || a=""
     case "${a:-y}" in
       [Nn]*) say "  넣지 않았습니다. 직접 볼 때: $DEST/skills/shared/scripts/check-install.sh" ;;
       *)     if hook_edit "$SET" add "$(hook_cmd "$DEST")"; then
                echo "hook=SessionStart" >> "$MANIFEST"
                say "  넣었습니다: $SET"
              else
-               say "  넣지 못했습니다 (설정 파일을 읽을 수 없습니다). 그대로 두었습니다."
+               say "  넣지 못했습니다 (설정 파일을 읽을 수 없거나 도구가 없습니다). 그대로 두었습니다."
              fi ;;
     esac
   fi
