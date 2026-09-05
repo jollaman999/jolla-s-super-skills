@@ -290,6 +290,11 @@ ip -d link show <그 인터페이스> | sed -n 3p   # kind 가 wireguard/tun/ppp
 ip -4 route show default                 # 터널 밖 default 후보
 ```
 
+Windows 에는 `ip` 가 없어 `ssh-run.sh` 가 PowerShell 로 같은 것을 봅니다
+(`Find-NetRoute` · `Get-NetAdapter` · `Get-NetRoute`). 다만 **Windows 에는 `kind` 에 해당하는
+확답이 없습니다.** TAP 계열 VPN 이 이더넷으로 보이기 때문에, 터널이 아니라고 단정하지 않고
+"터널로 보이지 않음" 까지만 적습니다.
+
 **터널로 나가는 호스트가 하나도 없으면 묻지 않는다.** 있을 때만 B′ 질문 묶음에 한 줄 더 넣는다.
 
 > `<호스트>` 가 `wg0`(WireGuard)로 나갑니다. 터널 밖 default 는 `enp7s0` 하나입니다.

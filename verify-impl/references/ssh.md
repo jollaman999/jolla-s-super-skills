@@ -42,6 +42,14 @@ ssh: connect to host <점프호스트> port 10022: Connection timed out
 ip route get <대상IP>                      # 어느 인터페이스로 나가는가
 ip -d link show wg0 | sed -n 3p            # -> wireguard   (kind 로 판정. 이름 규칙은 못 믿는다)
 ip -4 route show default                   # 터널 밖 default 후보
+```
+
+Windows(Git Bash)에는 `ip` 가 없다. `ssh-run.sh` 의 `win_diag()` 가 PowerShell 로 대신 본다.
+
+```sh
+Find-NetRoute -RemoteIPAddress <대상IP>              # 어느 인터페이스로 나가는가
+Get-NetAdapter -InterfaceIndex <ifIndex>            # InterfaceType(IANA) 과 드라이버 설명
+Get-NetRoute -DestinationPrefix 0.0.0.0/0           # default 후보
 curl -s --interface <iface> https://ifconfig.me   # 그 경로로 나갈 때의 공인 IP
 ```
 

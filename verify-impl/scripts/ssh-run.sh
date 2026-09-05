@@ -19,6 +19,7 @@
 # exit : 0=성공(=pass 후보) 1=원격 비0 종료(=fail 후보) 2=접속/타임아웃/도구없음(=unknown)
 #
 # 이식성: 외부 의존은 ssh 와 awk 뿐이다. jq/python 은 쓰지 않는다.
+#         예외로 Windows 의 경로 진단에만 powershell 을 쓴다. 없으면 진단만 생략된다.
 #         timeout(1) 이 없는 환경(일부 Git Bash)에서는 내장 워치독으로 상한을 건다.
 set -uo pipefail
 ID="${1:?usage: ssh-run.sh <id> '<cmd>'}"; RCMD="${2:?remote command}"
@@ -137,10 +138,76 @@ iface_kind() {
   }'
 }
 
+# Windows 에는 ip(8) 이 없다. PowerShell 로 같은 세 가지를 뽑는다.
+#   나가는 인터페이스 / 그것이 터널인가 / 터널 밖 default 후보
+# 리눅스의 ip -d link 는 kind 로 확답을 주지만 Windows 에는 그런 것이 없다.
+# TAP 계열 VPN 은 이더넷으로 보인다. 그래서 "아니다" 라고 단정하지 않는다.
+win_diag() {
+  local psbin dst out dev ift desc kind cands
+  psbin=""
+  for c in powershell.exe powershell pwsh.exe pwsh; do have "$c" && { psbin="$c"; break; }; done
+  [ -n "$psbin" ] || return 0
+  case "$FIRSTHOP" in
+    *[!0-9.]*) dst=$(getent ahostsv4 "$FIRSTHOP" 2>/dev/null | awk 'NR==1{print $1}') ;;
+    *)         dst="$FIRSTHOP" ;;
+  esac
+  [ -z "$dst" ] && return 0
+
+  # 한 번만 부른다. 탭으로 구분해 awk 로 읽는다.
+  out=$("$psbin" -NoProfile -Command "
+\$ErrorActionPreference='SilentlyContinue'
+\$r = Find-NetRoute -RemoteIPAddress '$dst' | Select-Object -First 1
+if (-not \$r) { exit 0 }
+\$a = Get-NetAdapter -InterfaceIndex \$r.InterfaceIndex
+'DEV' + [char]9 + \$r.InterfaceAlias + [char]9 + \$a.InterfaceType + [char]9 + \$a.InterfaceDescription
+Get-NetRoute -DestinationPrefix '0.0.0.0/0' | ForEach-Object {
+  \$b = Get-NetAdapter -InterfaceIndex \$_.InterfaceIndex
+  'DEF' + [char]9 + \$_.InterfaceAlias + [char]9 + \$b.InterfaceType + [char]9 + \$_.RouteMetric + [char]9 + \$b.InterfaceDescription
+}" 2>/dev/null | tr -d '\r')
+  [ -n "$out" ] || return 0
+
+  dev=$( printf '%s\n' "$out" | awk -F'\t' '$1=="DEV"{print $2; exit}')
+  ift=$( printf '%s\n' "$out" | awk -F'\t' '$1=="DEV"{print $3; exit}')
+  desc=$(printf '%s\n' "$out" | awk -F'\t' '$1=="DEV"{print $4; exit}')
+  [ -n "$dev" ] || return 0
+  kind=$(win_kind "$ift" "$desc")
+
+  cands=""
+  while IFS="$(printf '\t')" read -r tag a t m d; do
+    [ "$tag" = DEF ] || continue
+    [ -z "$a" ] && continue
+    [ "$a" = "$dev" ] && continue
+    [ -n "$(win_kind "$t" "$d")" ] && continue
+    cands="$cands $a(metric $m)"
+  done <<WINDEFAULTS
+$out
+WINDEFAULTS
+
+  if [ -n "$kind" ]; then
+    printf '[진단] 첫 홉 %s 는 %s(%s)로 나감. 터널 밖 default 후보:%s' \
+      "$dst" "$dev" "$kind" "${cands:- 없음 (터널이 유일한 default)}"
+  else
+    printf '[진단] 첫 홉 %s 는 %s(ifType=%s, %s)로 나감. 터널로 보이지 않지만 Windows 에서는 TAP 계열 VPN 도 이더넷으로 보입니다. 다른 default 후보:%s' \
+      "$dst" "$dev" "$ift" "$desc" "${cands:- 없음}"
+  fi
+}
+
+# 터널로 볼 근거가 있으면 그 근거를, 없으면 빈 값. "아니다" 를 뜻하지 않는다.
+# ifType 은 IANA 번호다. 23=ppp(WAN Miniport 계열), 131=tunnel 만 본다.
+# 53=propVirtual 은 Hyper-V·VMware 가상 어댑터도 달고 나와서 터널로 세면 오탐이다.
+win_kind() { # <ifType> <설명>
+  case "$1" in 23|131) printf 'ifType=%s' "$1"; return 0 ;; esac
+  case "$2" in
+    *WireGuard*|*Wintun*|*TAP-Windows*|*TAP-Win32*|*OpenVPN*|*AnyConnect*|\
+    *WAN\ Miniport*|*Tailscale*|*ZeroTier*|*NordLynx*|*Proton*|*Mullvad*)
+      printf '설명=%s' "$2" ;;
+  esac
+}
+
 # 접속 실패의 원인 판단에 필요한 로컬 라우팅 상태. 패킷을 내보내지 않는다.
-# ip(8) 가 없는 환경(Windows Git Bash)에서는 조용히 생략한다.
+# ip(8) 가 없으면 Windows 쪽으로 넘긴다. 둘 다 없으면 조용히 생략한다.
 net_diag() {
-  have ip || return 0
+  have ip || { win_diag; return 0; }
   local dst dev kind cands d m
   case "$FIRSTHOP" in
     *[!0-9.]*) dst=$(getent ahostsv4 "$FIRSTHOP" 2>/dev/null | awk 'NR==1{print $1}') ;;
