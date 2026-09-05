@@ -10,7 +10,7 @@
 #   --project DIR : 그 프로젝트 안에만 설치한다 (DIR/.claude)
 #   --copy        : 심볼릭 링크 대신 복사한다. 링크를 못 만드는 환경용
 #   --force       : 이미 있는 일반 파일/디렉터리를 <이름>.bak.<날짜> 로 옮기고 덮어쓴다
-#   --check       : 이 환경에서 실행될 수 있는지만 보고 끝낸다. 아무것도 안 바꾼다
+#   --check       : 환경과 설치 상태를 보고 끝낸다. 아무것도 안 바꾼다
 #   --dry-run     : 무엇을 할지만 출력하고 아무것도 안 바꾼다
 #   --uninstall   : 이 스크립트가 설치한 것만 지운다 (남의 파일은 안 건드린다)
 #   --yes         : 물어보지 않고 기본값(전역·링크)으로 진행한다
@@ -23,6 +23,13 @@ set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 CFG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 MANIFEST_NAME=".jolla-skills.manifest"
+
+# python 은 settings.json 을 안전하게 병합할 때 쓴다. preflight 가 돌기 전에도
+# 필요해서(해제 경로) 여기서 한 번 정한다.
+PY=""
+for _c in python3 python py; do
+  command -v "$_c" >/dev/null 2>&1 && "$_c" -c 'import sys' >/dev/null 2>&1 && { PY="$_c"; break; }
+done
 
 SCOPE=""; PROJDIR=""; MODE=""
 FORCE=0; DRY=0; UNINSTALL=0; YES=0; CHECK=0
@@ -137,7 +144,6 @@ preflight() {
     have "$c" && printf 'x' | "$c" >/dev/null 2>&1 && { H="$c"; break; }
   done
   [ -n "$H" ] && pf_ok "해시 도구: $H (snapshot.sh 용)" || pf_bad "md5sum/sha1sum/shasum/cksum 이 전부 없거나 실행되지 않습니다"
-  PY=""
   for c in python3 python py; do
     have "$c" && "$c" -c 'import sys' >/dev/null 2>&1 && { PY="$c"; break; }
   done
@@ -230,6 +236,57 @@ else
 fi
 MANIFEST="$DEST/$MANIFEST_NAME"
 
+# --- SessionStart 훅 ---
+# 링크가 깨지면 skill 도 CLAUDE.md 도 경고 없이 사라진다. 세션 시작 때 그것만 알린다.
+# settings.json 은 사용자 파일이라 내가 넣은 항목만 골라 넣고 뺀다.
+# 표식은 명령 안에 든 check-install.sh 라는 이름이다.
+
+# 훅 명령은 반드시 0 으로 끝난다. 0 이 아니면 Claude Code 가 그 출력을 모델에 싣지 않는다
+# (실측: echo 만 하는 훅은 닿고, 종료 코드 1 을 내는 훅은 안 닿았다).
+hook_cmd() { # <설치위치>
+  printf 'S="%s/skills/shared/scripts/check-install.sh"; if [ -x "$S" ]; then "$S" --quiet "%s" || true; else echo "skills 설치가 깨졌습니다: 검사 스크립트에 닿지 못합니다 (%s/skills/shared). repo 를 옮겼거나 지웠는지 보세요"; fi; exit 0' "$1" "$1" "$1"
+}
+
+# python 이 없으면 JSON 을 안전하게 병합할 수 없다. 그때는 2 를 내고 부르는 쪽이 안내한다.
+hook_edit() { # <settings.json> <add|remove> [명령]
+  [ -n "$PY" ] || return 2
+  "$PY" - "$1" "$2" "${3:-}" <<'PYJSON'
+import json, os, sys
+path, op, cmd = sys.argv[1], sys.argv[2], sys.argv[3]
+MARK = "check-install.sh"
+try:
+    with open(path, encoding="utf-8") as f:
+        cfg = json.load(f)
+    if not isinstance(cfg, dict):
+        raise ValueError
+except FileNotFoundError:
+    cfg = {}
+except Exception:
+    sys.exit(3)                       # 사람이 고쳐 둔 것을 덮어쓰지 않는다
+hooks = cfg.setdefault("hooks", {})
+lst = hooks.get("SessionStart") or []
+if not isinstance(lst, list):
+    sys.exit(3)
+def mine(e):
+    return any(MARK in (h or {}).get("command", "") for h in (e or {}).get("hooks", []))
+lst = [e for e in lst if not mine(e)]              # 내가 넣은 것만 걷어낸다
+if op == "add":
+    lst.append({"matcher": "",
+                "hooks": [{"type": "command", "command": cmd, "timeout": 5}]})
+if lst:
+    hooks["SessionStart"] = lst
+else:
+    hooks.pop("SessionStart", None)
+if not hooks:
+    cfg.pop("hooks", None)
+tmp = path + ".tmp"
+with open(tmp, "w", encoding="utf-8") as f:
+    json.dump(cfg, f, ensure_ascii=False, indent=2)
+    f.write("\n")
+os.replace(tmp, path)
+PYJSON
+}
+
 # --- 해제 ---
 # 기록(manifest)이 있으면 거기 적힌 것만 지운다. 없으면 예전 방식대로 링크만 본다.
 if [ "$UNINSTALL" -eq 1 ]; then
@@ -258,6 +315,11 @@ if [ "$UNINSTALL" -eq 1 ]; then
         else say "  제거   $rel  (복사본)"; run rm -rf "$d"; fi
       fi
     done < <(sed -n 's/^path=//p' "$MANIFEST")
+    if grep -qxF "hook=SessionStart" "$MANIFEST" 2>/dev/null; then
+      if [ "$DRY" -eq 1 ]; then say "  제거   settings.json 의 SessionStart 훅"
+      elif hook_edit "$DEST/settings.json" remove; then say "  제거   settings.json 의 SessionStart 훅"
+      else say "  건너뜀 settings.json 의 SessionStart 훅  (python 없음 또는 읽을 수 없음). 직접 지우세요"; fi
+    fi
     run rm -f "$MANIFEST"
     # 비게 된 디렉터리만 정리한다. rmdir 은 비지 않은 것은 건드리지 않는다.
     for d in skills agents; do rmdir "$DEST/$d" 2>/dev/null; done
@@ -306,11 +368,16 @@ link_failed_notice() {
 # --check 는 점검만 하고 끝낸다. 예전 doctor.sh 가 하던 일이다.
 if [ "$CHECK" -eq 1 ]; then
   preflight
+  say
+  # 설치된 링크가 아직 살아 있는지도 본다. 깨지면 skill 이 조용히 사라지기 때문이다.
+  "$REPO/shared/scripts/check-install.sh" "$DEST"; INST=$?
+  say
   if [ "$PF_FAIL" -gt 0 ]; then
     say "필수 항목 ${PF_FAIL}개가 빠졌습니다. 주의 ${PF_WARN}개."
     exit 1
   fi
   say "필수 항목은 전부 있습니다. 주의 ${PF_WARN}개."
+  [ "$INST" -eq 1 ] && exit 1
   exit 0
 fi
 
@@ -438,6 +505,39 @@ fi
   for p in "${PLACED[@]}"; do echo "path=$p"; done
 } > "$MANIFEST"
 
+# --- SessionStart 훅 (물어보고 넣는다) ---
+# 커밋 훅과 같은 관례다 - 묻지 않고 깔지 않는다.
+SET="$DEST/settings.json"
+if grep -q "check-install.sh" "$SET" 2>/dev/null; then
+  :                                       # 이미 걸려 있다. 다시 묻지 않는다
+elif [ "$DRY" -eq 1 ]; then
+  say
+  say "  (dry-run) SessionStart 훅을 걸지 물었을 것입니다"
+else
+  say
+  say "설치가 깨졌는지 세션 시작 때 알려주는 훅을 걸 수 있습니다."
+  say "  하는 일: 설치한 ${#PLACED[@]}개가 살아 있는지 본다. 0초, 네트워크 없음, 읽기만"
+  say "  깨졌을 때만 말하고 정상이면 아무 말도 안 합니다"
+  if [ -z "$PY" ]; then
+    say
+    say "  python 이 없어 $SET 을 안전하게 고칠 수 없습니다. 직접 넣으세요:"
+    say "  hooks.SessionStart 에 type=command 로:"
+    say "    $(hook_cmd "$DEST")"
+  else
+    a=y
+    if ask; then printf '%s' "  $SET 에 넣을까요? [Y/n]: "; read -r a || a=""; else a=n; fi
+    case "${a:-y}" in
+      [Nn]*) say "  넣지 않았습니다. 직접 볼 때: $DEST/skills/shared/scripts/check-install.sh" ;;
+      *)     if hook_edit "$SET" add "$(hook_cmd "$DEST")"; then
+               echo "hook=SessionStart" >> "$MANIFEST"
+               say "  넣었습니다: $SET"
+             else
+               say "  넣지 못했습니다 (설정 파일을 읽을 수 없습니다). 그대로 두었습니다."
+             fi ;;
+    esac
+  fi
+fi
+
 # --- 확인 ---
 say
 say "[확인]"
@@ -477,5 +577,6 @@ say
 say "다음 단계"
 say "  커밋 훅:     $DEST/skills/hooks/install-hooks.sh <repo>"
 say "  repo 프로필: $DEST/skills/shared/scripts/repo-profile.sh <repo>"
+say "  설치 점검:   $0 $([ "$SCOPE" = project ] && echo "--project $PROJDIR ")--check"
 say "  해제:        $0 $([ "$SCOPE" = project ] && echo "--project $PROJDIR ")--uninstall"
 [ "$OK" -eq 1 ] || exit 1

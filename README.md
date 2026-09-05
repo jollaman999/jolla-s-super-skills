@@ -52,7 +52,7 @@ Git Bash 를 찾아 넘겨주며, 아래 옵션은 그대로 전달됩니다. �
 ./install.sh --global                # 묻지 않고 전역
 ./install.sh --project ~/work/api    # 그 프로젝트에만
 ./install.sh --copy                  # 링크 대신 복사 (링크를 못 만드는 환경)
-./install.sh --check                 # 이 환경에서 될지만 봅니다. 아무것도 안 바꿉니다.
+./install.sh --check                 # 환경과 설치 상태를 봅니다. 아무것도 안 바꿉니다.
 ./install.sh --dry-run               # 무엇을 할지만 봅니다.
 ./install.sh --force                 # 기존 파일을 .bak 으로 옮기고 덮어씁니다.
 ./install.sh --uninstall             # 이 스크립트가 설치한 것만 지웁니다.
@@ -60,6 +60,18 @@ Git Bash 를 찾아 넘겨주며, 아래 옵션은 그대로 전달됩니다. �
 
 심볼릭 링크로 걸기 때문에 repo 를 `git pull` 하면 바로 반영됩니다.
 링크가 아닌 파일이 이미 있으면 건드리지 않고 멈춥니다.
+
+**링크가 깨지면 아무 경고 없이 사라집니다.** repo 를 옮기거나 지우면 링크가 전부 끊기는데,
+`ls` 로 봐도 링크는 멀쩡해 보이고 세션은 조용히 시작합니다. 없어진 skill 은 목록에서 그냥 빠지고,
+`CLAUDE.md` 가 끊기면 작업 규칙 전체가 사라집니다.
+
+```sh
+./install.sh --check                                   # 지금 살아 있는지 본다
+~/.claude/skills/shared/scripts/check-install.sh       # 같은 검사만 따로
+```
+
+설치 끝에 **세션 시작 때 이걸 자동으로 보는 훅을 걸지 물어봅니다.** 0초에 네트워크도 안 쓰고,
+깨졌을 때만 알립니다. 정상이면 아무 말도 안 합니다. `--uninstall` 이 이 훅도 지웁니다.
 
 **프로젝트 설치를 쓰면** 문서에 적힌 `~/.claude/skills/...` 경로를
 `<프로젝트>/.claude/skills/...` 로 바꿔 읽으세요. 배치는 같습니다.
