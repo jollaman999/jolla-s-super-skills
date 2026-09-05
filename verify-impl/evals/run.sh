@@ -12,6 +12,7 @@
 #   --turns    : 세션 최대 턴 수 (기본 30). 모자라면 답변 전에 잘린다
 #   --timeout  : 세션 하나의 제한 시간, 초 (기본 420)
 #   --jobs     : 케이스를 몇 개까지 동시에 돌릴지 (기본 1). 많이 띄우면 느려져 제한 시간에 걸린다
+#   --outdir   : 결과를 이 폴더에 남긴다 (<케이스>.out, summary.txt, exit). 안 주면 임시 폴더에 넣고 끝나며 지운다
 #
 # exit: 0=전부 통과  1=규칙 실패 있음  2=사용법 오류 또는 세션을 못 돌림
 set -uo pipefail
@@ -20,9 +21,9 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO="$(cd "$HERE/../.." && pwd -P)"
 CASEDIR="$HERE/cases"
 
-KEEP=0; MODEL=""; TURNS=30; LIMIT=420; REPS=1; REPS_SET=0; JOBS=1; WANT=()
+KEEP=0; MODEL=""; TURNS=30; LIMIT=420; REPS=1; REPS_SET=0; JOBS=1; OUTDIR=""; WANT=()
 
-usage() { sed -n '3,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -32,6 +33,7 @@ while [ $# -gt 0 ]; do
     --turns)   shift; TURNS="${1:-30}" ;;
     --timeout) shift; LIMIT="${1:-420}" ;;
     --jobs)    shift; JOBS="${1:-1}" ;;
+    --outdir)  shift; OUTDIR="${1:-}" ;;
     -h|--help) usage; exit 0 ;;
     -*)        usage >&2; exit 2 ;;
     *)         WANT+=("$1") ;;
@@ -41,6 +43,20 @@ done
 
 command -v claude >/dev/null || { echo "claude 가 PATH 에 없습니다" >&2; exit 2; }
 command -v jq     >/dev/null || { echo "jq 가 없습니다" >&2; exit 2; }
+
+# --outdir 를 주면 결과를 거기에 남기고 지우지 않는다. 밖에서 임시 폴더를 찾아
+# 폴링할 필요가 없어진다. 실행을 둘 띄웠을 때 남의 폴더를 집는 일도 없어진다.
+if [ -n "$OUTDIR" ]; then
+  mkdir -p "$OUTDIR" 2>/dev/null || { echo "--outdir 을 만들 수 없습니다: $OUTDIR" >&2; exit 2; }
+  [ -w "$OUTDIR" ] || { echo "--outdir 에 쓸 수 없습니다: $OUTDIR" >&2; exit 2; }
+  # 지난 판정과 섞여 읽히지 않게 이 스크립트가 쓰는 것만 지운다. 다른 파일은 건드리지 않는다.
+  rm -f "$OUTDIR"/*.out "$OUTDIR/summary.txt" "$OUTDIR/exit"
+fi
+
+# 집계는 표준출력과 summary.txt 에 같이 낸다. 종료 코드는 exit 파일로 남긴다.
+# 밖에서 감시하는 쪽은 exit 가 생겼는지만 보면 끝난 것을 안다.
+say()    { printf '%s\n' "$*"; [ -n "$OUTDIR" ] && printf '%s\n' "$*" >> "$OUTDIR/summary.txt"; return 0; }
+finish() { [ -n "$OUTDIR" ] && printf '%s\n' "$1" > "$OUTDIR/exit"; exit "$1"; }
 
 # 로그인 정보는 설치본에서 가져와 임시 폴더에 넣는다. 없으면 세션이 "Not logged in" 으로 끝난다.
 CREDS="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json"
@@ -611,8 +627,12 @@ run_case() { # <케이스이름>
 }
 
 PASS=0; FAIL=0; ERR=0; FAILED=(); ERRED=()
-OUTD=$(mktemp -d)
-trap 'rm -rf "$OUTD"' EXIT
+if [ -n "$OUTDIR" ]; then
+  OUTD="$OUTDIR"
+else
+  OUTD=$(mktemp -d)
+  trap 'rm -rf "$OUTD"' EXIT
+fi
 
 # 케이스끼리는 샌드박스가 따로라 같이 돌려도 안 부딪힌다.
 # 다만 동시에 너무 많이 띄우면 세션이 느려져 제한 시간에 걸린다.
@@ -639,13 +659,13 @@ done
 
 echo
 if [ "$REPS" -eq 1 ]; then
-  echo "$((PASS+FAIL))개 중 ${PASS}개 통과, ${FAIL}개 실패"
+  say "$((PASS+FAIL))개 중 ${PASS}개 통과, ${FAIL}개 실패"
 else
-  echo "$((PASS+FAIL))개 중 ${PASS}개가 전부 통과, ${FAIL}개는 한 번이라도 실패"
+  say "$((PASS+FAIL))개 중 ${PASS}개가 전부 통과, ${FAIL}개는 한 번이라도 실패"
 fi
 if [ "$ERR" -gt 0 ]; then
-  echo "돌리지 못함: ${ERRED[*]} - 규칙이 아니라 환경 문제입니다. 로그인이 풀렸는지 보세요"
-  exit 2
+  say "돌리지 못함: ${ERRED[*]} - 규칙이 아니라 환경 문제입니다. 로그인이 풀렸는지 보세요"
+  finish 2
 fi
-[ "$FAIL" -eq 0 ] || { echo "실패: ${FAILED[*]}"; exit 1; }
-exit 0
+[ "$FAIL" -eq 0 ] || { say "실패: ${FAILED[*]}"; finish 1; }
+finish 0
