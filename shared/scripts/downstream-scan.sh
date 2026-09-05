@@ -22,7 +22,7 @@ QUIET=0; REPO=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -q|--quiet) QUIET=1; shift ;;
-    -h|--help)  sed -n '2,17p' "$0"; exit 0 ;;
+    -h|--help)  sed -n '2,18p' "$0"; exit 0 ;;
     *)          REPO="$1"; shift ;;
   esac
 done

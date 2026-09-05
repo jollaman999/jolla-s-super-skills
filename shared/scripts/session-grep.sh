@@ -35,12 +35,12 @@ while [ $# -gt 0 ]; do
     -l|--list)    LIST=1; shift ;;
     --full)       FULL=1; shift ;;
     --dump)       DUMP="$2"; shift 2 ;;
-    -h|--help)    sed -n '2,20p' "$0"; exit 0 ;;
+    -h|--help)    sed -n '2,22p' "$0"; exit 0 ;;
     -*)           echo "모르는 옵션: $1" >&2; exit 2 ;;
     *)            [ -z "$PAT" ] && PAT="$1" || { echo "패턴은 하나만" >&2; exit 2; }; shift ;;
   esac
 done
-[ -n "$PAT" ] || { sed -n '2,20p' "$0"; exit 2; }
+[ -n "$PAT" ] || { sed -n '2,22p' "$0"; exit 2; }
 
 CFG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 ROOT="$CFG/projects"
