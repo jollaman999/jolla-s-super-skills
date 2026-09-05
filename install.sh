@@ -681,9 +681,12 @@ if [ "$SCOPE" = project ]; then
 fi
 
 say
-say "다음 단계"
-say "  커밋 훅:     $DEST/skills/hooks/install-hooks.sh <repo>"
-say "  repo 프로필: $DEST/skills/shared/scripts/repo-profile.sh <repo>"
-say "  설치 점검:   $0 $([ "$SCOPE" = project ] && echo "--project $PROJDIR ")--check"
-say "  해제:        $0 $([ "$SCOPE" = project ] && echo "--project $PROJDIR ")--uninstall"
+say "필요할 때만 쓰는 명령입니다. 지금 해야 할 것은 없습니다."
+say "  커밋 훅     고칠 repo 마다 한 번. 시크릿·표기 규칙을 커밋 전에 거른다"
+say "              $DEST/skills/hooks/install-hooks.sh <repo>"
+say "  repo 프로필 그 repo 의 커밋 스타일을 읽어 기록한다"
+say "              $DEST/skills/shared/scripts/repo-profile.sh <repo>"
+say "  설치 점검   링크가 깨졌는지 본다. 이상해 보일 때"
+say "              $0 $([ "$SCOPE" = project ] && echo "--project $PROJDIR ")--check"
+say "  해제        $0 $([ "$SCOPE" = project ] && echo "--project $PROJDIR ")--uninstall"
 [ "$OK" -eq 1 ] || exit 1
