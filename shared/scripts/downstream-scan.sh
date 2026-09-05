@@ -28,6 +28,26 @@ REPO=$(cd "$REPO" 2>/dev/null && pwd -P) || { echo "확인 불가: 경로 없음
 NAME=$(basename "$REPO")
 PARENT=$(dirname "$REPO")
 
+# 폴더 이름은 흔한 영어 단어일 수 있다 (skills, core, common...). 그것만으로 찾으면
+# 남의 repo 산문에 걸린다. 리모트에 적힌 진짜 repo 이름도 같이 검색어로 쓴다.
+RNAME=$(git -C "$REPO" remote get-url origin 2>/dev/null | sed -e 's#.*[/:]##' -e 's#\.git$##')
+[ "$RNAME" = "$NAME" ] && RNAME=""
+
+# 정규식에 넣을 것이라 메타문자를 죽인다
+esc() { printf '%s' "$1" | sed 's#[][\.^$*+?(){}|/]#\\&#g'; }
+NAME_RE=$(esc "$NAME")
+RNAME_RE=$(esc "$RNAME")
+
+# 이름이 나왔다고 참조가 아니다. 경로꼴이거나 리모트 이름일 때만 센다.
+#   경로꼴  : /<이름>  또는  <이름>/     (~/.claude/skills/... , ai/skills)
+#   리모트  : jolla-s-super-skills       (산문에 안 나오는 이름)
+REF_RE="(/${NAME_RE}|${NAME_RE}/)"
+[ -n "$RNAME" ] && REF_RE="${REF_RE}|${RNAME_RE}"
+
+# 버전이 박힌 자리도 같은 이름 짝으로 본다
+PIN_NAMES="$NAME_RE"
+[ -n "$RNAME" ] && PIN_NAMES="${NAME_RE}|${RNAME_RE}"
+
 # 훑을 대상: 형제 디렉터리 + DOWNSTREAM_ROOTS 아래 한 단계
 TARGETS=()
 for d in "$PARENT"/*/; do
@@ -58,7 +78,7 @@ echo "## 버전이 고정돼 있는 곳 (반영을 빠뜨려도 티가 안 나�
 echo
 PINNED=0
 for d in "${TARGETS[@]}"; do
-  out=$(grep -rInE "${NAME}[:@/-]?v?[0-9]+\.[0-9]+(\.[0-9]+)?" "$d" \
+  out=$(grep -rInE "(${PIN_NAMES})[:@/-]?v?[0-9]+\.[0-9]+(\.[0-9]+)?" "$d" \
         --include='*.yaml' --include='*.yml' --include='*.tf' --include='*.tfvars' \
         --include='*.json' --include='*.env' --include='Makefile' --include='*.mk' \
         --include='*.sh' --include='*.go' --include='*.md' \
@@ -76,11 +96,11 @@ if [ "$QUIET" = 1 ]; then
   [ "$PINNED" = 1 ] && exit 0 || exit 1
 fi
 
-echo "## 이름만 참조하는 곳 (파일 수)"
+echo "## 경로나 리모트 이름으로 참조하는 곳 (파일 수)"
 echo
 FOUND=0
 for d in "${TARGETS[@]}"; do
-  n=$(grep -rIl "$NAME" "$d" \
+  n=$(grep -rIlE "$REF_RE" "$d" \
       --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=vendor \
       --exclude-dir=dist --exclude-dir=build 2>/dev/null | wc -l)
   [ "$n" -gt 0 ] || continue
