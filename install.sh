@@ -314,11 +314,11 @@ $bak  = "$Path.jolla-bak"
 try {
   if (Test-Path -LiteralPath $Path) {
     Copy-Item -LiteralPath $Path -Destination $bak -Force
-    $raw = Get-Content -LiteralPath $Path -Raw
+    $raw = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
     if ($raw.Trim().Length -eq 0) { $cfg = New-Object PSObject }
     else { $cfg = $raw | ConvertFrom-Json }
   } else { $cfg = New-Object PSObject }
-} catch { exit 3 }
+} catch { Remove-Item -LiteralPath $bak -Force -ErrorAction SilentlyContinue; exit 3 }
 
 function Has($o, $n) { return ($o.PSObject.Properties.Name -contains $n) }
 if (-not (Has $cfg 'hooks')) { $cfg | Add-Member -NotePropertyName hooks -NotePropertyValue (New-Object PSObject) }
@@ -361,7 +361,7 @@ try {
 # 쓰고 나서 확인한다. 시험하지 못한 경로라 결과를 믿지 않는다.
 $ok = $false
 try {
-  $back = Get-Content -LiteralPath $Path -Raw
+  $back = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
   $null = $back | ConvertFrom-Json
   $hasMark  = $back.Contains($MARK)
   $isArray  = ($back -match '"SessionStart"\s*:\s*\[')
