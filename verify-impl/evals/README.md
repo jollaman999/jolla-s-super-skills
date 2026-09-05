@@ -179,7 +179,8 @@ verify-impl/evals/run.sh --model claude-opus-5           # 고친 뒤 통과 개
 
 ## 지금 있는 케이스
 
-옆에 있는 `cases.md` 의 59개 중 아래를 옮겨 놓았습니다.
+옆에 있는 `cases.md` 에 적어 둔 것 중 아래를 `cases/` 로 옮겨 놓았습니다.
+지금 몇 개인지는 `ls verify-impl/evals/cases/*.txt | wc -l` 로 봅니다.
 
 **명령을 봐서 판정하는 것**
 
