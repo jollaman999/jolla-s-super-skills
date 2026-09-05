@@ -4,7 +4,10 @@
 #
 # usage: downstream-scan.sh [repo] [옵션]
 #   repo : 기본 $PWD
-#   -q, --quiet   버전이 박힌 곳만 (가장 자주 놓치는 것)
+#   -q, --quiet   링크와 버전이 박힌 곳만 (가장 자주 놓치는 것)
+#
+# 심볼릭 링크로 연결된 곳은 항상 먼저 낸다. 링크는 글자가 아니라 grep 이 못 보는데,
+# 고치면 그 자리에서 바로 영향이 간다 (`.git/hooks` 에 깔린 훅이 대표적이다).
 #
 # env: DOWNSTREAM_ROOTS  추가로 훑을 경로들 (':' 구분). 형제 디렉터리는 기본 포함이다.
 #      예) DOWNSTREAM_ROOTS=~/git/terraform:~/문서/배포
@@ -19,7 +22,7 @@ QUIET=0; REPO=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -q|--quiet) QUIET=1; shift ;;
-    -h|--help)  sed -n '2,14p' "$0"; exit 0 ;;
+    -h|--help)  sed -n '2,17p' "$0"; exit 0 ;;
     *)          REPO="$1"; shift ;;
   esac
 done
@@ -73,6 +76,25 @@ echo
 echo "훑은 범위: $PARENT/* ${DOWNSTREAM_ROOTS:+· $DOWNSTREAM_ROOTS}"
 echo
 
+# 링크로 연결된 곳. 여기는 이름을 안 찾는다 - 링크를 따라가서 이 repo 안이면 확정이다.
+# 추측이 아니라서 오탐이 없다. .git 안에 깔린 훅이 대표적이라 .git 을 빼지 않는다.
+echo "## 링크로 연결된 곳 (고치면 즉시 영향)"
+echo
+LINKED=0
+for d in "${TARGETS[@]}"; do
+  out=$(find "$d" -type l 2>/dev/null | while read -r l; do
+          t=$(readlink -f "$l" 2>/dev/null) || continue
+          case "$t" in "$REPO"/*) printf '%s -> %s\n' "${l#"$d"/}" "${t#"$REPO"/}" ;; esac
+        done | head -12)
+  [ -n "$out" ] || continue
+  LINKED=1
+  echo "### $(basename "$d")"
+  printf '%s\n' "$out" | sed 's/^/  /'
+  echo
+done
+[ "$LINKED" = 1 ] || echo "  없음"
+echo
+
 # 버전이 고정된 줄. 여기를 안 고치면 배포는 성공하고 옛 버전이 실행된다.
 echo "## 버전이 고정돼 있는 곳 (반영을 빠뜨려도 티가 안 나는 자리)"
 echo
@@ -93,7 +115,8 @@ done
 echo
 
 if [ "$QUIET" = 1 ]; then
-  [ "$PINNED" = 1 ] && exit 0 || exit 1
+  { [ "$PINNED" = 1 ] || [ "$LINKED" = 1 ]; } && exit 0
+  exit 1
 fi
 
 echo "## 경로나 리모트 이름으로 참조하는 곳 (파일 수)"
@@ -112,4 +135,4 @@ echo
 echo "> 후보일 뿐이다. 실제로 따라가야 하는 것만 골라 \`.claude/downstream.md\` 에 기록하면"
 echo "> 다음부터는 이 스캔 대신 그 파일을 본다."
 
-[ "$FOUND" = 1 ] || [ "$PINNED" = 1 ]
+[ "$FOUND" = 1 ] || [ "$PINNED" = 1 ] || [ "$LINKED" = 1 ]
