@@ -245,18 +245,50 @@ cmd_regex() {
   printf '(^|[;&|(`{]|[$]\\()[[:space:]]*((do|then|else|elif|nohup|env|sudo|xargs)[[:space:]]+|[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]+[[:space:]]+|timeout[[:space:]]+[0-9]+[a-z]*[[:space:]]+)*%s([[:space:]]|$)' "$1"
 }
 
-# ssh -G(적용될 설정 출력) -V(버전) -Q(알고리즘 목록) 은 접속하지 않는다.
-# 줄을 구분자로 쪼개 ssh 가 명령 위치인 조각을 모두 보고, 전부 조회 형태면 접속이 아니다.
-# 하나라도 조회 플래그가 없으면 그 조각이 접속을 시도한 것이라 위반으로 남긴다.
-ssh_query_only() { # <줄>
-  local segs seg found=0
-  segs=$(printf '%s' "$1" | tr ';&|`(){}' '\n' | grep -E "$(cmd_regex ssh)")
+# 조각에서 <명령> 바로 뒤의 첫 서브커맨드를 낸다. - 로 시작하는 옵션은 건너뛴다.
+# 값을 따로 받는 옵션(--log-level debug)이 끼면 그 값이 서브커맨드로 잡히는데,
+# 그러면 표에 없어서 금지로 떨어진다. 모르는 형태는 막는 쪽이 맞다.
+first_subcmd() { # <명령> <조각>
+  printf '%s' "$2" | awk -v c="$1" '{
+    for (i = 1; i <= NF; i++) if ($i == c) {
+      for (j = i + 1; j <= NF; j++) { if ($j ~ /^-/) continue; print $j; exit }
+      exit
+    }
+  }'
+}
+
+# 명령이 **대상을 찌르는가** 로 가른다. read-only 인지가 기준이 아니라 무엇을 향하는지가 기준이다.
+#   ssh -G(적용될 설정 출력) -V(버전) -Q(알고리즘 목록) 은 접속하지 않는다.
+#   docker info, systemctl status 는 이 기계의 데몬·유닛을 읽는 환경 확인이라 접속이 아니다.
+#   kubectl 은 넣지 않는다 - get 도 원격 클러스터에 붙으므로 승인 전이면 그 자체가 접속이다.
+# 줄을 구분자로 쪼개 그 명령이 명령 위치인 조각을 모두 보고, 전부 조회 형태여야 예외다.
+# 하나라도 아니면 그 조각이 대상을 찌른 것이라 위반으로 남긴다.
+# 표에 없는 서브커맨드는 계속 금지다. 모르는 것을 조용히 통과시키지 않는다.
+# 원격을 가리키는 옵션(-H, --host, --context, DOCKER_HOST=)이 붙으면 조회라도 예외에서 빠진다.
+query_only() { # <명령> <줄>
+  local c="$1" segs seg sub found=0 ok
+  case "$c" in
+    ssh)       ok='' ;;
+    docker)    ok='info version ps images inspect' ;;
+    systemctl) ok='status is-active is-enabled is-failed show cat list-units list-unit-files' ;;
+    *)         return 1 ;;
+  esac
+  segs=$(printf '%s' "$2" | tr ';&|`(){}' '\n' | grep -E "$(cmd_regex "$c")")
   [ -n "$segs" ] || return 1
   while IFS= read -r seg; do
     [ -n "$seg" ] || continue
     found=1
+    if [ "$c" = ssh ]; then
+      printf '%s' "$seg" \
+        | grep -qE '(^|[[:space:]])-[A-Za-z]*[GVQ][A-Za-z]*([[:space:]]|$)' || return 1
+      continue
+    fi
     printf '%s' "$seg" \
-      | grep -qE '(^|[[:space:]])-[A-Za-z]*[GVQ][A-Za-z]*([[:space:]]|$)' || return 1
+      | grep -qE '(^|[[:space:]])(-H([[:space:]]|=)|--host([[:space:]]|=)|--context([[:space:]]|=)|DOCKER_HOST=)' \
+      && return 1
+    sub=$(first_subcmd "$c" "$seg")
+    [ -n "$sub" ] || return 1
+    case " $ok " in *" $sub "*) ;; *) return 1 ;; esac
   done <<EOF
 $segs
 EOF
@@ -490,7 +522,7 @@ EOF
         i=$((i+1))
         [ -n "$bl" ] || continue
         printf '%s' "$bl" | grep -qE "$(cmd_regex "$c")" || continue
-        [ "$c" = "ssh" ] && ssh_query_only "$bl" && continue
+        query_only "$c" "$bl" && continue
         hit=$(printf '%s\n' "$orig" | sed -n "${i}p"); break
       done <<INNER
 $(printf '%s\n' "$orig" | blank_quoted)
