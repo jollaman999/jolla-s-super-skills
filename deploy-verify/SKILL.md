@@ -199,6 +199,8 @@ timeout 60 ssh -n root@"$H" "docker inspect <svc> --format '{{.Config.Image}} {{
 
 레시피 → `references/deploy.md`
 
+헬스 대기가 5분을 넘으면 무엇이 도는지·언제 다시 볼지·무엇이 나오면 끝인지를 낸다 → `../shared/references/waiting.md`
+
 ### 헬스가 안 뜨면
 
 **로그를 먼저 본다.** 재시도부터 하지 않는다.
