@@ -133,6 +133,8 @@ flowchart TD
 
 **시작 전에 `.claude/verify-progress.md` 를 먼저 본다.**
 
+**남이 이미 고쳤는지도 같이 본다** - 지난 세션 발화는 `session-grep.sh`, 남의 커밋은 `git log`. 기록에 적힌 것은 단서지 근거가 아니다 → `../shared/references/concurrent-sessions.md`
+
 | 상황 | 행동 |
 |------|------|
 | 파일 없음 | 새로 시작. P 로 간다. |

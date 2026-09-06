@@ -48,6 +48,8 @@ description: 승인받은 계획서를 작업 단위로 실행한다. 작업마�
 
 **시작 전에 `.claude/plan-progress.md` 를 먼저 본다.**
 
+**남이 이미 한 작업이 있는지도 같이 본다** - 지난 세션 발화는 `session-grep.sh`, 남의 커밋은 `git log`. 진행 파일에 적힌 것은 단서지 근거가 아니다 → `../shared/references/concurrent-sessions.md`
+
 | 상황 | 행동 |
 |------|------|
 | 파일 없음 | 새로 시작 |

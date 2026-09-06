@@ -91,6 +91,8 @@ rg -n "<기능 이름>" --type-add 'src:*.{go,py,ts,js}' -tsrc | head -20
 git log --oneline -10 -- <관련 경로>
 ```
 
+**내 기억에 없는 변경이 이미 들어가 있을 수 있다.** 남의 커밋과 지난 세션 발화(`session-grep.sh`)를 같이 본다 → `../shared/references/concurrent-sessions.md`
+
 확인할 것.
 
 | 무엇 | 왜 |

@@ -56,6 +56,8 @@ timeout 30 ssh -n root@"$H" "pgrep -af '<서비스명>|ansible|docker (build|loa
 | 다른 세션이 같은 repo 에 있음 | 커밋 단계에서 `git add -A` 금지. 경로를 명시해 add |
 | 원격에서 다른 작업이 돎 | **재기동하지 않는다.** 사용자에게 알리고 기다릴지 묻는다. |
 
+**다른 세션이 이미 배포했거나 고쳤는지도 본다** - 지난 세션 발화는 `session-grep.sh`, 남의 커밋은 `git log`. 중복 배포와 헛다리 원인 지목을 막는다.
+
 절차 → `../shared/references/concurrent-sessions.md`
 
 ### 이전 진행 확인 · 진행 기록
