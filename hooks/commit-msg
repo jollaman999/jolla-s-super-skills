@@ -12,6 +12,8 @@
 #   - em dash 금지 (제목·본문 전부)
 #   - 제목 뒤 ' - ' / ' — ' 부연 금지  (부연은 본문에 쓴다)
 #   - 제목과 본문 사이 빈 줄  (없으면 %s 가 본문까지 먹는다)
+#   - 그 repo 의 접두사 체계 (.claude/repo-profile.md 가 conventional 로 뽑았을 때만)
+#   - 그 repo 의 티켓번호 (프로필에서 분석 대상의 과반이 제목에 넣었을 때만)
 #
 # 본문 자체는 막지 않는다. 부연이 필요하면 본문에 쓴다.
 set -uo pipefail
@@ -62,6 +64,60 @@ if [ "$SKIP_SUBJ" -eq 0 ] && printf '%s' "$SUBJ" | grep -qE ' [-—] .+$'; then
   echo "    $SUBJ"
   echo "    -> 부연은 제목에서 떼고 본문(빈 줄 다음)에 쓰세요"
   FAIL=1
+fi
+
+# --- repo 프로필 기반 제목 검사 ---
+# 판정 근거는 <repo 최상위>/.claude/repo-profile.md 다. repo-profile.sh 가 만든다.
+# 프로필이 없으면 검사하지 않는다.
+#
+# 허용 접두사 목록과 티켓 프로젝트키를 여기 적지 않는다. repo 마다 다르고,
+# 소스에 박으면 그 값이 공개 repo 로 나가는 데다 남의 repo 에서 멀쩡한 제목을 막는다.
+# 조직명 목록을 훅 밖에서 읽는 것과 같은 이유다.
+#
+# 자동 생성 제목은 여기서도 뺀다 - 남의 커밋 제목이라 내 규칙을 걸 자리가 아니다.
+TOPDIR=$(git rev-parse --show-toplevel 2>/dev/null || true)
+PROF="${TOPDIR:-.}/.claude/repo-profile.md"
+if [ "$SKIP_SUBJ" -eq 0 ] && [ -n "$TOPDIR" ] && [ -f "$PROF" ]; then
+  # '| 항목 | 값 |' 표에서 값 칸만 꺼낸다.
+  prof_cell() { sed -n "s/^|[[:space:]]*$1[[:space:]]*|\(.*\)|.*$/\1/p" "$PROF" | head -1; }
+
+  # 판정은 집계 괄호 **앞부분**만 본다. 값 칸에는 'conventional' 이 판정과 집계
+  # 양쪽에 나오기 때문이다. 아래 두 줄은 conventional 이 아닌데 그 낱말을 담고 있다.
+  #   **접두사 없음** (conventional 11 · 스코프형 1 · 없음 187)
+  #   **스코프형 (모듈명: ...)** (conventional 0 · 스코프형 100 · 없음 4)
+  # 낱말만 찾으면 셋 다 conventional 로 잡혀 남의 repo 커밋을 막는다.
+  PREFIX_KIND=$(prof_cell 접두사 | sed -e 's/(.*//' -e 's/[*`]//g' -e 's/[[:space:]]//g')
+
+  # 접두사가 '있는지' 만 본다. 어느 낱말인지는 안 본다.
+  # '### 접두사 top 10' 을 허용 목록으로 쓰면 안 된다. 그건 빈도 상위 10칸을 자른 것이라
+  # 덜 쓰는 접두사가 목록 밖으로 밀리고, 프로필을 뽑은 뒤 새로 쓰기 시작한 것도 빠진다.
+  # 실제로 그렇게 만들었다가 정상 커밋이 막혔다. 프로필이 인용한 제목을 훅이 막는 일까지 났다.
+  # 여기서 잡으려는 것은 '접두사가 통째로 빠진 제목' 이지 낱말 선택이 아니다.
+  if [ "$PREFIX_KIND" = conventional ]; then
+    if ! printf '%s' "$SUBJ" | grep -qE '^[a-z][a-z0-9]*(\([^)]*\))?!?: '; then
+      red "차단: 제목에 conventional 접두사가 없음"
+      echo "    $SUBJ"
+      echo "    -> '<접두사>: 무엇을 했다' 또는 '<접두사>(스코프): 무엇을 했다' 형태로 쓰세요"
+      echo "    -> 이 repo 를 conventional 로 판정한 근거: $PROF"
+      FAIL=1
+    fi
+  fi
+
+  # 티켓 과반 판정. '| 티켓번호 | 제목에 189 개 |' 에는 분모가 없으므로
+  # '- 분석 범위: ... 최근 199 개' 에서 전체 수를 잡는다. 둘 중 하나라도 못 뽑으면 검사하지 않는다.
+  TICKET_N=$(prof_cell 티켓번호 | grep -oE '제목에[[:space:]]*[0-9]+[[:space:]]*개' | grep -oE '[0-9]+' | head -1)
+  TOTAL_N=$(grep -m1 '^- 분석 범위:' "$PROF" | grep -oE '최근[[:space:]]*[0-9]+[[:space:]]*개' | grep -oE '[0-9]+' | head -1)
+  if [ -n "${TICKET_N:-}" ] && [ -n "${TOTAL_N:-}" ] && [ "$((10#$TOTAL_N))" -gt 0 ] \
+     && [ $((10#$TICKET_N * 2)) -gt "$((10#$TOTAL_N))" ]; then
+    if ! printf '%s' "$SUBJ" | grep -qE '[A-Z][A-Z0-9]+-[0-9]+'; then
+      red "차단: 제목에 티켓번호가 없음"
+      echo "    $SUBJ"
+      echo "    -> 이 repo 는 분석한 $TOTAL_N 개 중 $TICKET_N 개가 제목에 티켓번호를 넣습니다"
+      echo "    -> 형태: 대문자 프로젝트키-숫자 (제목 어디에 있어도 됩니다)"
+      echo "    -> 근거: $PROF"
+      FAIL=1
+    fi
+  fi
 fi
 
 # --- 본문 구분 ---
