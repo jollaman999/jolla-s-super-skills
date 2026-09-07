@@ -69,6 +69,13 @@ timeout 400 ssh -n root@"$H" "bash /data/scripts/run_<svc>.sh"
 
 **백업 없이 설정을 덮어쓰지 않는다.** 원복 경로가 있어야 재기동 승인을 받을 수 있다.
 
+**만든 백업은 언제 지울지까지 같이 받아 둔다.** 재기동 승인(SKILL.md 5 단계)에서 용량과
+그 파티션 여유를 적고 (a) 검증 뒤 삭제 / (b) 남김 을 고르게 한다. 처분은 8b 에서 한다.
+
+```sh
+timeout 60 ssh -n root@"$H" "du -sh /app-config/application.yaml.bak.*; df -h /app-config | tail -1"
+```
+
 ## 롤백
 
 ```sh
@@ -94,6 +101,8 @@ timeout 400 ssh -n root@"$H" "cp /app-config/application.yaml.bak.<ts> /app-conf
 
 - 전송 무결성 확인 없이 로드
 - 백업 없이 설정 덮어쓰기
+- 검증이 끝나기 전에 백업 지우기 (롤백 재료다)
+- 백업을 만들어 놓고 처분을 안 정한 채 끝내기
 - 운영 전체 동시 재기동 (묻고 한다)
 - 실패한 호스트를 남기고 다음으로 진행
 - `timeout` / `ssh -n` 없는 원격 명령
