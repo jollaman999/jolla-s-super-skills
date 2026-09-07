@@ -413,7 +413,7 @@ id | 대상(file:line 또는 호스트:포트) | 방법 | 절차(복붙 가능�
 > **VF-04  GPU 이상징후 카드**
 > - 정상으로 봄: `anomalySummary.xidErrors` 가 숫자
 > - 문제로 봄: 필드 없음 / undefined
-> - 출처: 백엔드 응답 클래스 `NodeGpuSummaryResponse.java:72`
+> - 출처: 백엔드 응답 타입 `NodeGpuSummaryResponse.java:72`
 > - → 이 기준이 맞습니까?
 >
 > **VF-09  GPU 텔레메트리 수집**
