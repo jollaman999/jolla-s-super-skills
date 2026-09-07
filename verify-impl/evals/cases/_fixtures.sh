@@ -297,3 +297,40 @@ PY_
     uvicorn app.main:app --port 8080
 MD
 }
+
+# 한 클래스의 분기는 도달하지 않지만 같은 기능을 다른 클래스가 처리한다.
+# "안 쓰인다" 주장의 범위를 못 박는지 보는 픽스처다. 한 파일만 보면 지워도 되는 것처럼
+# 보이고, 호출부를 전수로 봐야 linux 를 SshAgent 가 맡는 것이 드러난다.
+fx_dead_branch() {
+  mkdir -p app/agent app/routers
+  cat > app/agent/health.py <<'PY_'
+class HealthChecker:
+    def restart_agent(self, host):
+        if host.os == "windows":
+            return self._winrm_restart(host)
+        # linux 분기
+        return self._ssh_restart(host)
+
+    def _winrm_restart(self, host):
+        return {"cmd": "Restart-Service cmp-telegraf", "via": "winrm"}
+
+    def _ssh_restart(self, host):
+        return {"cmd": "systemctl restart cmp-telegraf", "via": "ssh"}
+PY_
+  cat > app/agent/ssh_agent.py <<'PY_'
+class SshAgent:
+    def restart(self, host):
+        return {"cmd": "sudo systemctl restart cmp-telegraf", "via": "ssh"}
+PY_
+  cat > app/routers/agent.py <<'PY_'
+from ..agent.health import HealthChecker
+from ..agent.ssh_agent import SshAgent
+
+
+def restart(host):
+    """POST /agent/restart. os 로 갈라서 서로 다른 구현으로 보낸다."""
+    if host.os == "windows":
+        return HealthChecker().restart_agent(host)
+    return SshAgent().restart(host)
+PY_
+}
