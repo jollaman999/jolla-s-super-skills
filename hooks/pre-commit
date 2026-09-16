@@ -36,9 +36,13 @@ while IFS= read -r -d '' f; do
 done < <(git diff --cached --name-only -z --diff-filter=ACM)
 [ ${#STAGED[@]} -eq 0 ] && exit 0
 
+# 검사가 볼 파일. 기본은 스테이지된 전부다.
+# 비밀번호 검사만 이 배열을 갈아 끼워 파일 종류별로 나눠 본다 (아래 참조).
+SCOPE=("${STAGED[@]}")
+
 check() { # <라벨> <정규식> <설명> [제외정규식]
   local hits
-  hits=$(git diff --cached --unified=0 -- "${STAGED[@]}" 2>/dev/null \
+  hits=$(git diff --cached --unified=0 -- "${SCOPE[@]}" 2>/dev/null \
          | grep -nE '^\+' | grep -vE '^\+\+\+' | grep -inE "$2" | head -5)
   # 제외정규식이 있으면 거기 걸리는 줄은 뺀다. 값이 리터럴이 아니라
   # 코드 참조인 경우를 걸러내려는 것이지, 탐지를 느슨하게 하려는 것이 아니다.
@@ -60,10 +64,44 @@ check() { # <라벨> <정규식> <설명> [제외정규식]
 # 점 뒤가 소문자이고 괄호도 없으므로 계속 걸린다.
 CODE_REF='[:=][\"'"'"' ]*[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*\(|\.[A-Z][A-Za-z0-9_]*[,)]?$)'
 
-check "비밀번호로 보이는 문자열" \
-  '(password|passwd|pw)[\"'"'"' ]*[:=][\"'"'"' ]*[^ \"'"'"',}$#]{6,}' \
-  "값을 지우고 env 변수명으로 바꾸세요" \
-  "$CODE_REF"
+# 값이 가짜임을 그 줄에 적어 두면 비밀번호 검사만 넘긴다. 테스트 픽스처가 이것이다.
+# --no-verify 와 다른 점은 나머지 검사가 그대로 돈다는 것이다.
+# 토큰·키 검사에는 안 건다 - 형태가 확실해 오탐이 거의 없고, 넘길 길을 열어 두면
+# 진짜로 유출된 토큰이 주석 한 줄로 통과한다.
+ALLOW='hook:allow'
+
+# 비밀번호 검사는 파일 종류로 가른다.
+# Go 소스에서 : 나 = 뒤에 따옴표 없이 오는 값은 식별자라 비밀번호 리터럴일 수 없다.
+#   Password:    password,        <- 구조체 필드에 변수 대입
+#   host.Password = password
+# 그래서 .go 에서는 따옴표(" ' `)로 감싼 값만 본다.
+# const dbPassword = "abc123" 같은 진짜 리터럴은 그대로 걸린다.
+# 반대로 yaml·env·ini·properties 는 따옴표 없는 값이 곧 실제 비밀번호라 그대로 둔다.
+GO_FILES=()
+ETC_FILES=()
+for f in "${STAGED[@]}"; do
+  case "$f" in
+    *.go) GO_FILES+=("$f") ;;
+    *)    ETC_FILES+=("$f") ;;
+  esac
+done
+
+if [ ${#GO_FILES[@]} -gt 0 ]; then
+  SCOPE=("${GO_FILES[@]}")
+  check "비밀번호로 보이는 문자열" \
+    '(password|passwd|pw)[\"'"'"'` ]*[:=][[:space:]]*[\"'"'"'`][^ \"'"'"'`,}$#]{6,}' \
+    "값을 지우고 env 변수명으로 바꾸세요" \
+    "$CODE_REF|$ALLOW"
+fi
+
+if [ ${#ETC_FILES[@]} -gt 0 ]; then
+  SCOPE=("${ETC_FILES[@]}")
+  check "비밀번호로 보이는 문자열" \
+    '(password|passwd|pw)[\"'"'"' ]*[:=][\"'"'"' ]*[^ \"'"'"',}$#]{6,}' \
+    "값을 지우고 env 변수명으로 바꾸세요" \
+    "$CODE_REF|$ALLOW"
+fi
+SCOPE=("${STAGED[@]}")
 
 check "JWT 토큰" \
   'eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}' \
