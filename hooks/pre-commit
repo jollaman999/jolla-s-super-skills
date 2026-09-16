@@ -70,6 +70,14 @@ CODE_REF='[:=][\"'"'"' ]*[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*\(|\.[A-
 # 진짜로 유출된 토큰이 주석 한 줄로 통과한다.
 ALLOW='hook:allow'
 
+# 꺾쇠 자리표시자는 값이 아니라 "여기에 네 값을 넣어라" 는 표시다. 문서의 예제와
+# 명령줄 사용법이 쓰는 보편적인 표기라서, 이것까지 막으면 README 의 코드 블록에
+# hook:allow 주석을 넣게 되고 그 주석이 독자에게 그대로 보인다.
+#   -d '{"password":"<your-password>"}'
+#   --password <PASSWORD>
+# 값 전체가 꺾쇠로 감싸인 경우만 뺀다. <a>bc 처럼 뒤에 뭔가 붙으면 계속 걸린다.
+PLACEHOLDER='[:=][\"'"'"' ]*<[A-Za-z0-9 _.-]+>([\"'"'"',;}) ]|$)'
+
 # 비밀번호 검사는 파일 종류로 가른다.
 # 프로그래밍 언어 소스에서 : 나 = 뒤에 따옴표 없이 오는 값은 식별자라 비밀번호일 수 없다.
 #   Password:    password,        <- 구조체 필드에 변수 대입 (Go)
@@ -97,7 +105,7 @@ if [ ${#CODE_FILES[@]} -gt 0 ]; then
   check "비밀번호로 보이는 문자열" \
     '(password|passwd|pw)[\"'"'"'` ]*[:=][[:space:]]*[\"'"'"'`][^ \"'"'"'`,}$#]{6,}' \
     "값을 지우고 env 변수명으로 바꾸세요" \
-    "$CODE_REF|$ALLOW"
+    "$CODE_REF|$ALLOW|$PLACEHOLDER"
 fi
 
 if [ ${#ETC_FILES[@]} -gt 0 ]; then
@@ -105,7 +113,7 @@ if [ ${#ETC_FILES[@]} -gt 0 ]; then
   check "비밀번호로 보이는 문자열" \
     '(password|passwd|pw)[\"'"'"' ]*[:=][\"'"'"' ]*[^ \"'"'"',}$#]{6,}' \
     "값을 지우고 env 변수명으로 바꾸세요" \
-    "$CODE_REF|$ALLOW"
+    "$CODE_REF|$ALLOW|$PLACEHOLDER"
 fi
 SCOPE=("${STAGED[@]}")
 
