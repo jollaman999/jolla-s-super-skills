@@ -71,23 +71,29 @@ CODE_REF='[:=][\"'"'"' ]*[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*\(|\.[A-
 ALLOW='hook:allow'
 
 # 비밀번호 검사는 파일 종류로 가른다.
-# Go 소스에서 : 나 = 뒤에 따옴표 없이 오는 값은 식별자라 비밀번호 리터럴일 수 없다.
-#   Password:    password,        <- 구조체 필드에 변수 대입
+# 프로그래밍 언어 소스에서 : 나 = 뒤에 따옴표 없이 오는 값은 식별자라 비밀번호일 수 없다.
+#   Password:    password,        <- 구조체 필드에 변수 대입 (Go)
 #   host.Password = password
-# 그래서 .go 에서는 따옴표(" ' `)로 감싼 값만 본다.
+#   body.password = values.password;   <- 속성 대입 (JS)
+# 그래서 아래 확장자에서는 따옴표(" ' `)로 감싼 값만 본다.
 # const dbPassword = "abc123" 같은 진짜 리터럴은 그대로 걸린다.
-# 반대로 yaml·env·ini·properties 는 따옴표 없는 값이 곧 실제 비밀번호라 그대로 둔다.
-GO_FILES=()
+#
+# 셸(.sh/.bash/.zsh)은 여기 넣지 않는다. PASSWORD=hunter2 처럼 따옴표 없는 값이
+# 곧 실제 비밀번호라서다. yaml·env·ini·properties 도 같은 이유로 제외한다.
+CODE_FILES=()
 ETC_FILES=()
 for f in "${STAGED[@]}"; do
   case "$f" in
-    *.go) GO_FILES+=("$f") ;;
-    *)    ETC_FILES+=("$f") ;;
+    *.go|*.js|*.mjs|*.cjs|*.ts|*.tsx|*.jsx|*.java|*.kt|*.kts|*.rs|*.py|*.rb|\
+    *.c|*.h|*.cc|*.cpp|*.hpp|*.cs|*.swift|*.scala|*.dart)
+      CODE_FILES+=("$f") ;;
+    *)
+      ETC_FILES+=("$f") ;;
   esac
 done
 
-if [ ${#GO_FILES[@]} -gt 0 ]; then
-  SCOPE=("${GO_FILES[@]}")
+if [ ${#CODE_FILES[@]} -gt 0 ]; then
+  SCOPE=("${CODE_FILES[@]}")
   check "비밀번호로 보이는 문자열" \
     '(password|passwd|pw)[\"'"'"'` ]*[:=][[:space:]]*[\"'"'"'`][^ \"'"'"'`,}$#]{6,}' \
     "값을 지우고 env 변수명으로 바꾸세요" \
