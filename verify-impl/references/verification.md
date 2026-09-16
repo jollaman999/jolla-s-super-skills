@@ -6,7 +6,7 @@
 - 각 Agent 반환 (자연어 서술 금지):
 
 ```json
-{"host":"10.0.0.11","results":[{"id":"VF-01","verdict":"pass|fail|unknown","evidence":"출력 원문","cmd":"실행 명령"}]}
+{"host":"192.0.2.11","results":[{"id":"VF-01","verdict":"pass|fail|unknown","evidence":"출력 원문","cmd":"실행 명령"}]}
 ```
 
 - `evidence`는 **가공하지 않은 출력**. 요약하지 않는다. 시크릿만 마스킹.
@@ -30,7 +30,7 @@
 ### ssh (최우선)
 `scripts/ssh-run.sh`를 쓴다 - timeout·마스킹·점프호스트 내장, exit 0/1/2 = pass/fail/unknown.
 ```sh
-VH_HOST=10.0.0.11 VH_PW="$PW" VH_TO=60 scripts/ssh-run.sh VF-01 'docker inspect svc --format "{{.State.Health.Status}}"'
+VH_HOST=192.0.2.11 VH_PW="$PW" VH_TO=60 scripts/ssh-run.sh VF-01 'docker inspect svc --format "{{.State.Health.Status}}"'
 ```
 직접 짤 때도 규칙 동일: `timeout` 필수, `StrictHostKeyChecking=no`, 비밀번호는 변수로.
 레시피 → `ssh.md`

@@ -30,7 +30,7 @@ timeout 400 sshpass -p "$PW" ssh -n -o StrictHostKeyChecking=no root@"$H" \
 ## 다중 호스트 - 한 대씩 (운영 권장)
 
 ```sh
-for h in 10.0.0.11 10.0.0.12; do
+for h in 192.0.2.11 192.0.2.12; do
   echo "===== $h ====="
   timeout 300 sshpass -p "$PW" scp -o StrictHostKeyChecking=no /tmp/img.tar.gz root@"$h":/data/docker/
   timeout 400 sshpass -p "$PW" ssh -n -o StrictHostKeyChecking=no root@"$h" "…로드+재기동…"
@@ -45,7 +45,7 @@ done
 ```sh
 # 파일 해시
 echo "로컬: $(md5sum ./ansible.tar.gz | cut -c1-32)"
-for h in 10.0.0.11 10.0.0.12; do
+for h in 192.0.2.11 192.0.2.12; do
   echo -n "$h: "; timeout 60 ssh -n root@"$h" "md5sum /data/docker/ansible.tar.gz | cut -c1-32"
 done
 

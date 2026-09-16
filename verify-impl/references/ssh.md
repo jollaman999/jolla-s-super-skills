@@ -102,7 +102,7 @@ timeout 240 sshpass -p "$PW" ssh -o StrictHostKeyChecking=no root@"$JUMP" \
 Agent별로 나누는 게 기본이지만, 한 Agent 안에서 훑을 때:
 
 ```sh
-for h in "10.0.0.11 22" "203.0.113.20 2002" "10.0.0.12 22"; do
+for h in "192.0.2.11 22" "203.0.113.20 2002" "192.0.2.12 22"; do
   set -- $h
   echo "===== $1 ====="
   timeout 60 sshpass -p "$PW" ssh -o StrictHostKeyChecking=no -p "$2" root@"$1" '명령' 2>&1
@@ -141,7 +141,7 @@ timeout 60 ssh ... "docker exec influxdb influx query 'from(bucket:\"b\") |> ran
 
 ```sh
 echo "로컬: $(md5sum ./ansible.tar.gz | cut -c1-32)"
-for h in 10.0.0.11 10.0.0.12; do
+for h in 192.0.2.11 192.0.2.12; do
   echo -n "$h: "; timeout 60 ssh ... root@$h "md5sum /data/docker/ansible.tar.gz | cut -c1-32"
 done
 # 이미지 태그

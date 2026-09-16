@@ -16,7 +16,7 @@ tools: Bash, Read
 항목을 하나씩 실행하고 판정한다. `~/.claude/skills/verify-impl/scripts/ssh-run.sh` 를 쓴다. timeout, 시크릿 마스킹, 점프호스트가 이미 들어 있고 exit code 가 0/1/2 = pass/fail/unknown 이다.
 
 ```sh
-VH_HOST=10.0.0.11 VH_USER=root VH_PW="$PW" VH_TO=60 \
+VH_HOST=192.0.2.11 VH_USER=root VH_PW="$PW" VH_TO=60 \
   ~/.claude/skills/verify-impl/scripts/ssh-run.sh VF-01 'docker inspect app-svc --format "{{.State.Health.Status}}"'
 ```
 
@@ -51,7 +51,7 @@ VH_HOST=10.0.0.11 VH_USER=root VH_PW="$PW" VH_TO=60 \
 
 ```json
 {
-  "host": "10.0.0.11",
+  "host": "192.0.2.11",
   "reachable": true,
   "results": [
     {"id":"VF-01","verdict":"pass","evidence":"healthy","cmd":"docker inspect app-svc --format ...","via":"direct"},
