@@ -148,6 +148,16 @@ plan-implementer  ->  plan-reviewer  ->  커밋  ->  진행 파일 갱신  ->  �
 | 같은 파일이지만 고치는 자리가 다름 (다른 함수, 다른 키) | `Agent` 의 `isolation: "worktree"` 로 동시에. 끝나면 팀장이 워크트리 diff 를 하나씩 `git apply --3way` 로 가져온다 |
 | 같은 자리를 고침, 또는 한쪽 결과를 다른 쪽이 씀 | 순차 |
 
+worktree 로 띄울 때 알아 둘 것.
+
+| 무엇 | 어떻게 |
+|------|--------|
+| 어디에 생기나 | `<repo>/.claude/worktrees/agent-<id>`, 브랜치 `worktree-agent-<id>`. 완료 알림의 `worktreePath` 에 경로가 온다 |
+| 메인 워킹트리에서 | `?? .claude/worktrees/` 로 보인다. **`git add -A` 를 하면 들어간다.** 경로를 지정해 add 한다 |
+| 가져오기 | `git -C <worktreePath> diff > p && git apply --3way p`. **결과가 스테이지까지 된다** - 확인은 `git diff --cached` 로 한다 |
+| 충돌 | exit 1, 파일에 충돌 표시가 남고 `UU` 가 된다. `git checkout HEAD -- <파일>` 로 그 시도를 되돌린다 |
+| 뒷정리 | 변경이 있는 worktree 는 끝나도 `locked` 로 남는다. `git worktree remove --force --force <경로>` 와 `git branch -D worktree-agent-<id>` 로 지운다 |
+
 **가져오다가 충돌하면 풀지 않는다.** 먼저 가져온 쪽을 커밋하고, 충돌한 작업은 그 위에서 다시 띄운다.
 워크트리로 나눌 때 늘어나는 비용은 가져오기 한 번이다. 충돌이 잦은 파일(번역 카탈로그처럼 한 파일에 전부 모인 것)은 처음부터 순차로 간다.
 
