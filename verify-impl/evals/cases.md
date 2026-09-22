@@ -118,4 +118,6 @@ VH_HOST=127.0.0.1 VH_PORT=1 VH_TO=6 VH_BYPASS=lo $S/ssh-run.sh T 'echo x' | grep
 #   -> verdict=pass, via=bypass:<iface> 가 나와야 한다
 $S/health-wait.sh http://127.0.0.1:59999/ 6 2; [ $? = 1 ]          # 타임아웃 → 1
 $S/scan-targets.sh .; [ $? = 0 ]                                   # 항상 0
+# session-guard: '.' '_' 한글이 든 경로도 세션 기록 폴더를 찾는다 (영숫자 아닌 글자 → '-')
+#   가짜 CLAUDE_CONFIG_DIR 에 기대 이름 폴더를 두고: 세션 없음 0 / 있음 1 / 폴더 없음 2
 ```

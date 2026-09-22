@@ -58,6 +58,29 @@ printf '%s' "$out" | grep -q '\[진단\]' && ok || bad "접속 불가인데 진�
 out=$(env VH_HOST=127.0.0.1 VH_PORT=1 VH_TO=6 "$S/ssh-run.sh" T 'echo x' 2>&1)
 printf '%s' "$out" | grep -q '진단' && bad "refused 인데 진단이 붙음" || ok
 
+echo "== session-guard 슬러그"
+# Claude Code 는 경로의 영숫자가 아닌 글자를 한 글자당 '-' 하나로 바꿔 세션 기록 폴더를 만든다.
+# '/' 만 바꾸면 '.' '_' 한글이 든 경로에서 기록을 못 찾아 exit 2 가 난다.
+# 기대 이름은 스크립트와 따로 python 으로 만든다. 같은 함수로 만들면 같이 틀려도 통과한다.
+SG="$REPO/shared/scripts/session-guard.sh"
+if command -v python3 >/dev/null 2>&1; then
+  T=$(mktemp -d)
+  P="$T/a_b.c/포스코"; mkdir -p "$P" "$T/cfg/projects"
+  P=$(cd "$P" && pwd -P)
+  want=$(python3 -c 'import re,sys; print(re.sub(r"[^A-Za-z0-9]","-",sys.argv[1]))' "$P")
+  mkdir -p "$T/cfg/projects/$want"
+  rc_is 0 "기록 폴더가 있고 세션이 없으면 0" env CLAUDE_CONFIG_DIR="$T/cfg" "$SG" "$P" 10
+  touch "$T/cfg/projects/$want/s1.jsonl"
+  rc_is 1 "'.' '_' 한글 경로의 활성 세션을 찾으면 1" env CLAUDE_CONFIG_DIR="$T/cfg" "$SG" "$P" 10
+  rc_is 1 "C 로케일에서도 한글을 한 글자로 센다" env LC_ALL=C CLAUDE_CONFIG_DIR="$T/cfg" "$SG" "$P" 10
+  rc_is 1 "다른 세션 ID 로 돌면 그대로 센다" env CLAUDE_SESSION_ID=nobody CLAUDE_CONFIG_DIR="$T/cfg" "$SG" "$P" 10
+  rc_is 0 "내 세션만 있으면 0" env CLAUDE_SESSION_ID=s1 CLAUDE_CONFIG_DIR="$T/cfg" "$SG" "$P" 10
+  rc_is 2 "기록 폴더가 없으면 확인 불가(2)" env CLAUDE_CONFIG_DIR="$T/cfg" "$SG" "$T" 10
+  rm -r "$T"
+else
+  skip "python3 가 없어 session-guard 슬러그 6건"
+fi
+
 echo "== 나머지 스크립트"
 rc_is 1 "health-wait 타임아웃은 1" "$S/health-wait.sh" http://127.0.0.1:59999/ 6 2
 rc_is 0 "scan-targets 는 항상 0"   "$S/scan-targets.sh" "$REPO"
