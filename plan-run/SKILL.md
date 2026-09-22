@@ -61,7 +61,7 @@ description: 승인받은 계획서를 작업 단위로 실행한다. 작업마�
 
 ```markdown
 # 계획 진행  (갱신: 2026-09-04 14:20)
-계획: docs/design/2026-09-04-node-alert.md · 대상: <repo> · 브랜치: feat/node-alert
+계획: .claude/design/2026-09-04-node-alert.md · 대상: <repo> · 브랜치: feat/node-alert
 
 | # | 작업 | 상태 | 커밋 | 검증 |
 |---|------|------|------|------|

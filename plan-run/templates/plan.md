@@ -1,6 +1,6 @@
 # <제목>
 
-설계: `docs/design/YYYY-MM-DD-<주제>.md`
+설계: `.claude/design/YYYY-MM-DD-<주제>.md`
 브랜치: `<브랜치>`
 
 ## 작업
