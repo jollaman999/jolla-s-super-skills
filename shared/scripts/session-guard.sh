@@ -6,7 +6,8 @@
 #   project_dir : 기본 $PWD
 #   idle_min    : 이 시간 안에 활동한 세션을 "활성" 으로 본다 (기본 10분)
 #
-# env: CLAUDE_SESSION_ID  (내 세션. 있으면 목록에서 제외)
+# env: CLAUDE_CODE_SESSION_ID  (내 세션. Claude Code 가 넣어 준다. 있으면 목록에서 제외)
+#      CLAUDE_SESSION_ID       (위가 없을 때 쓰는 옛 이름)
 #      CLAUDE_CONFIG_DIR  (기본 $HOME/.claude)
 # exit: 0=동시 세션 없음  1=동시 세션 있음  2=확인 불가
 #
@@ -16,7 +17,7 @@
 # 동시 세션 보호가 통째로 무력화된다.
 set -uo pipefail
 DIR="${1:-$PWD}"; IDLE="${2:-10}"
-ME="${CLAUDE_SESSION_ID:-}"
+ME="${CLAUDE_CODE_SESSION_ID:-${CLAUDE_SESSION_ID:-}}"
 CFG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 
 have() { command -v "$1" >/dev/null 2>&1; }

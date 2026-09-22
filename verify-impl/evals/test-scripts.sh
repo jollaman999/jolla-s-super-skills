@@ -71,14 +71,16 @@ if command -v python3 >/dev/null 2>&1; then
   mkdir -p "$T/cfg/projects/$want"
   rc_is 0 "기록 폴더가 있고 세션이 없으면 0" env CLAUDE_CONFIG_DIR="$T/cfg" "$SG" "$P" 10
   touch "$T/cfg/projects/$want/s1.jsonl"
-  rc_is 1 "'.' '_' 한글 경로의 활성 세션을 찾으면 1" env CLAUDE_CONFIG_DIR="$T/cfg" "$SG" "$P" 10
-  rc_is 1 "C 로케일에서도 한글을 한 글자로 센다" env LC_ALL=C CLAUDE_CONFIG_DIR="$T/cfg" "$SG" "$P" 10
-  rc_is 1 "다른 세션 ID 로 돌면 그대로 센다" env CLAUDE_SESSION_ID=nobody CLAUDE_CONFIG_DIR="$T/cfg" "$SG" "$P" 10
-  rc_is 0 "내 세션만 있으면 0" env CLAUDE_SESSION_ID=s1 CLAUDE_CONFIG_DIR="$T/cfg" "$SG" "$P" 10
+  rc_is 1 "'.' '_' 한글 경로의 활성 세션을 찾으면 1" env -u CLAUDE_CODE_SESSION_ID -u CLAUDE_SESSION_ID CLAUDE_CONFIG_DIR="$T/cfg" "$SG" "$P" 10
+  rc_is 1 "C 로케일에서도 한글을 한 글자로 센다" env -u CLAUDE_CODE_SESSION_ID -u CLAUDE_SESSION_ID LC_ALL=C CLAUDE_CONFIG_DIR="$T/cfg" "$SG" "$P" 10
+  rc_is 1 "다른 세션 ID 로 돌면 그대로 센다" env CLAUDE_CODE_SESSION_ID=nobody CLAUDE_SESSION_ID=nobody CLAUDE_CONFIG_DIR="$T/cfg" "$SG" "$P" 10
+  rc_is 0 "내 세션만 있으면 0" env -u CLAUDE_CODE_SESSION_ID CLAUDE_SESSION_ID=s1 CLAUDE_CONFIG_DIR="$T/cfg" "$SG" "$P" 10
+  # Claude Code 가 실제로 넣어 주는 이름은 CLAUDE_CODE_SESSION_ID 다. 이걸 안 읽으면 자기 세션을 남의 것으로 센다.
+  rc_is 0 "Claude Code 의 세션 변수로도 내 세션을 뺀다" env -u CLAUDE_SESSION_ID CLAUDE_CODE_SESSION_ID=s1 CLAUDE_CONFIG_DIR="$T/cfg" "$SG" "$P" 10
   rc_is 2 "기록 폴더가 없으면 확인 불가(2)" env CLAUDE_CONFIG_DIR="$T/cfg" "$SG" "$T" 10
   rm -r "$T"
 else
-  skip "python3 가 없어 session-guard 슬러그 6건"
+  skip "python3 가 없어 session-guard 7건"
 fi
 
 echo "== 나머지 스크립트"
