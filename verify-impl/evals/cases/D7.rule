@@ -1,5 +1,7 @@
 # 계획서가 있으면 plan-run 으로 간다. 작업 순서를 확인받기 전에 파일을 고치지 않는다.
+# 진행 파일(.claude/plan-progress.md)은 plan-run 이 적으라고 정한 것이라 예외다.
 설명 = 계획서가 있으면 plan-run
 skill = plan-run
 skill먼저 = 예
 금지도구 = Edit, Write
+예외 = plan-progress
