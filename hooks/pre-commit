@@ -36,12 +36,76 @@ while IFS= read -r -d '' f; do
 done < <(git diff --cached --name-only -z --diff-filter=ACM)
 [ ${#STAGED[@]} -eq 0 ] && exit 0
 
-# 검사가 볼 파일. 기본은 스테이지된 전부다.
+# 남의 코드를 그대로 들여온 파일. 아래 검사 대부분은 "우리가 쓴 글" 에 대한
+# 규칙이라, 압축된 남의 번들에 대고 돌리면 잡는 것보다 헛것이 많다.
+# swagger-ui 번들이 `_password=()=>"********"` 라는 마스킹 함수를 들고 있어서
+# npm 토큰 규칙에 걸린 것이 그 예다. 그 줄을 고칠 수도 없다 - 받은 파일의 해시를
+# 대조해서 쓰는 것이라 한 글자만 달라도 대조가 깨진다.
+#
+# 목록은 아래 셋을 순서대로 읽어 합친다. 한 줄에 경로 정규식 하나,
+# '#' 로 시작하는 줄과 빈 줄은 무시한다.
+#
+#   1) HOOK_VENDORED             파일 경로 (테스트·CI 용)
+#   2) $GITDIR/hooks/.vendored   이 repo 전용, 커밋되지 않음
+#   3) <repo>/.claude/hook-vendored   이 repo 전용, 커밋되어 팀원에게도 적용
+#
+# 3번은 조직명 목록과 달리 커밋되는 자리에 둔다. 적히는 것이 경로일 뿐
+# 감출 것이 없고, 같은 파일을 받는 사람마다 훅이 다르게 굴면 안 되기 때문이다.
+#
+# **개인키 검사는 이 목록과 무관하게 전부에 돈다.** PEM 헤더는 형태가 확실해
+# 남의 번들이 우연히 만들어 낼 수 없고, 남의 파일에 개인키가 들어 있는 것이야말로
+# 걸러야 하는 것이다.
+TOPDIR=$(git rev-parse --show-toplevel 2>/dev/null)
+
+VENDOR_FILES=()
+[ -n "${HOOK_VENDORED:-}" ] && VENDOR_FILES+=("$HOOK_VENDORED")
+[ -f "$GITDIR/hooks/.vendored" ] && VENDOR_FILES+=("$GITDIR/hooks/.vendored")
+[ -n "$TOPDIR" ] && [ -f "$TOPDIR/.claude/hook-vendored" ] \
+  && VENDOR_FILES+=("$TOPDIR/.claude/hook-vendored")
+
+VENDOR_RE=""
+if [ ${#VENDOR_FILES[@]} -gt 0 ]; then
+  VENDOR_RE=$(cat "${VENDOR_FILES[@]}" 2>/dev/null \
+              | sed 's/[[:space:]]*$//' \
+              | grep -vE '^[[:space:]]*(#|$)' \
+              | paste -sd '|' -)
+fi
+
+# SOURCE 는 우리가 쓴 파일. 대부분의 검사가 이것을 본다.
+# STAGED 는 그대로 남는다 - 개인키 검사와 파일 이름으로 거는 검사가 그것을 쓴다.
+SOURCE=()
+SKIPPED=()
+for f in "${STAGED[@]}"; do
+  if [ -n "$VENDOR_RE" ] && printf '%s' "$f" | grep -qE "$VENDOR_RE"; then
+    SKIPPED+=("$f")
+  else
+    SOURCE+=("$f")
+  fi
+done
+
+# 무엇을 안 봤는지 말한다. 조용히 건너뛰면 통과와 구별이 안 된다.
+if [ ${#SKIPPED[@]} -gt 0 ]; then
+  echo "  (알림: 들여온 파일이라 내용 검사에서 뺍니다. 개인키 검사는 그대로 돕니다)"
+  printf '%s\n' "${SKIPPED[@]}" | sed 's/^/           /'
+fi
+
+# 검사가 볼 파일. 기본은 우리가 쓴 것 전부다.
 # 비밀번호 검사만 이 배열을 갈아 끼워 파일 종류별로 나눠 본다 (아래 참조).
-SCOPE=("${STAGED[@]}")
+SCOPE=("${SOURCE[@]}")
+
+# 들여온 파일밖에 없으면 내용 검사는 볼 것이 없다. 빈 배열을 git 에 넘기면
+# 경로 제한이 통째로 빠져서 스테이지된 것 전부를 보게 된다 - 뺀 것이 도로 들어온다.
+if [ ${#SOURCE[@]} -eq 0 ]; then
+  SOURCE_EMPTY=1
+else
+  SOURCE_EMPTY=0
+fi
 
 check() { # <라벨> <정규식> <설명> [제외정규식]
   local hits
+  # 볼 파일이 없으면 여기서 끝낸다. 빈 배열을 git 에 넘기면 경로 제한이 없는
+  # diff 가 되어, 일부러 뺀 파일을 도로 보게 된다.
+  [ ${#SCOPE[@]} -eq 0 ] && return 0
   hits=$(git diff --cached --unified=0 -- "${SCOPE[@]}" 2>/dev/null \
          | grep -nE '^\+' | grep -vE '^\+\+\+' | grep -inE "$2" | head -5)
   # 제외정규식이 있으면 거기 걸리는 줄은 뺀다. 값이 리터럴이 아니라
@@ -93,7 +157,7 @@ PLACEHOLDER='[:=][\"'"'"' ]*<[^<>]+>([\"'"'"',;}) ]|$)'
 # 곧 실제 비밀번호라서다. yaml·env·ini·properties 도 같은 이유로 제외한다.
 CODE_FILES=()
 ETC_FILES=()
-for f in "${STAGED[@]}"; do
+for f in "${SOURCE[@]}"; do
   case "$f" in
     *.go|*.js|*.mjs|*.cjs|*.ts|*.tsx|*.jsx|*.java|*.kt|*.kts|*.rs|*.py|*.rb|\
     *.c|*.h|*.cc|*.cpp|*.hpp|*.cs|*.swift|*.scala|*.dart)
@@ -118,7 +182,7 @@ if [ ${#ETC_FILES[@]} -gt 0 ]; then
     "값을 지우고 env 변수명으로 바꾸세요" \
     "$CODE_REF|$ALLOW|$PLACEHOLDER"
 fi
-SCOPE=("${STAGED[@]}")
+SCOPE=("${SOURCE[@]}")
 
 check "JWT 토큰" \
   'eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}' \
@@ -146,9 +210,14 @@ check "URL 에 박힌 자격증명" \
   '://[A-Za-z0-9._%+-]+:[^[:space:]@/\"'"'"']{4,}@' \
   "자격증명을 URL 에서 빼고 env 나 인증 파일로 옮기세요"
 
+# 개인키만 스테이지된 전부를 본다. 들여온 파일도 포함이다.
+# PEM 헤더는 형태가 확실해 압축된 코드가 우연히 만들어 낼 수 없고, 남이 만든
+# 파일에 키가 들어 있는 것이야말로 여기서 걸러야 하는 것이다.
+SCOPE=("${STAGED[@]}")
 check "개인키" \
   'BEGIN [A-Z ]*PRIVATE KEY' \
   "키 파일은 커밋하지 않습니다"
+SCOPE=("${SOURCE[@]}")
 
 # 사내 조직·제품명은 **소스에 적지 않는다.**
 # 차단하려는 이름을 차단하는 코드에 박아 두면, 이 훅이 공개 repo 에 올라가는 순간
@@ -196,8 +265,8 @@ fi
 # 루프백 127.0.0.0/8 은 통과시킨다. 그 머신 밖으로 나가지 않아 사내망 주소를
 # 흘릴 수가 없고, 테스트가 127.0.0.2 같은 주소로 붙으면 연결이 즉시 거부돼
 # 빠르다. 문서용 대역은 응답이 없어 타임아웃까지 기다린다.
-if [ "$PROFILE" = public ]; then
-ips=$(git diff --cached --unified=0 -- "${STAGED[@]}" 2>/dev/null \
+if [ "$PROFILE" = public ] && [ "$SOURCE_EMPTY" -eq 0 ]; then
+ips=$(git diff --cached --unified=0 -- "${SOURCE[@]}" 2>/dev/null \
       | grep -E '^\+' | grep -vE '^\+\+\+' \
       | grep -hoE '([0-9]{1,3}\.){3}[0-9]{1,3}' | sort -u \
       | grep -vE '^(0\.0\.0\.0|127\.[0-9]+\.[0-9]+\.[0-9]+|192\.0\.2\.[0-9]+|198\.51\.100\.[0-9]+|203\.0\.113\.[0-9]+|1\.2\.3\.4)$' \
@@ -214,7 +283,7 @@ fi
 fi
 
 # em dash - 프로필 무관. 시크릿이 아니라 표기 규칙이라 공개/비공개가 갈릴 이유가 없다.
-if git diff --cached --unified=0 -- "${STAGED[@]}" 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+' | grep -q '—'; then
+if [ "$SOURCE_EMPTY" -eq 0 ] && git diff --cached --unified=0 -- "${SOURCE[@]}" 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+' | grep -q '—'; then
   red "차단: em dash(—) 사용"
   echo "    -> 하이픈(-)으로 바꾸세요"
   FAIL=1
@@ -227,7 +296,6 @@ fi
 esc_re() { printf '%s' "$1" | sed 's/[][\.*^$\/&]/\\&/g'; }
 QUOTE=$(printf '\047')
 BOUND="(/|[\"$QUOTE ,);]|$)"
-TOPDIR=$(git rev-parse --show-toplevel 2>/dev/null)
 for d in "$HOME" "$TOPDIR"; do
   [ -n "$d" ] && [ "$d" != "/" ] || continue
   check "박힌 절대경로" "$(esc_re "$d")$BOUND" \
@@ -245,7 +313,7 @@ fi
 # 스테이지된 조각이 아니라 워킹트리의 파일 전체를 본다 - 문법 검사는 조각으로는 못 한다.
 if command -v shellcheck >/dev/null; then
   SHFILES=()
-  for f in "${STAGED[@]}"; do
+  for f in "${SOURCE[@]}"; do
     case "$f" in *.sh) SHFILES+=("$f"); continue ;; esac
     head -c 40 "$f" 2>/dev/null | head -1 \
       | grep -qE '^#!.*[ /](bash|sh|dash|ksh)( |$)' && SHFILES+=("$f")
