@@ -31,15 +31,25 @@ ROOT="$CFG/projects"
   exit 2
 }
 
-# 슬러그 후보. Claude Code 는 작업 디렉터리 경로의 구분자를 '-' 로 바꿔 이름을 만든다.
-#   Linux/WSL : /home/me/proj/app      -> -home-me-proj-app
+# 슬러그 후보. Claude Code 는 경로에서 영숫자가 아닌 글자를 한 글자당 '-' 하나로 바꿔 이름을 만든다.
+# 구분자만이 아니라 '.' '_' 한글도 바뀐다.
+#   Linux/WSL : /home/me/arp_project   -> -home-me-arp-project
+#               /tmp/tmp.Ab12/proj     -> -tmp-tmp-Ab12-proj
 #   Windows    : C:\Users\me\proj\app  -> Claude Code 가 보는 것은 Windows 경로다
+# 한글이 바이트 수만큼 '-' 가 되지 않게 UTF-8 로케일에서 바꾼다.
+slug() {
+  local s
+  for loc in C.UTF-8 C.utf8 en_US.UTF-8; do
+    s=$(printf '%s' "$1" | LC_ALL=$loc sed 's/[^A-Za-z0-9]/-/g' 2>/dev/null) && [ -n "$s" ] && { printf '%s' "$s"; return; }
+  done
+  printf '%s' "$1" | sed 's/[^A-Za-z0-9]/-/g'
+}
 CANDS=()
-CANDS+=("$(printf '%s' "$DIR" | sed 's#/#-#g')")
+CANDS+=("$(slug "$DIR")")
 if have cygpath; then
   for form in -w -m; do
     w=$(cygpath "$form" "$DIR" 2>/dev/null) || continue
-    [ -n "$w" ] && CANDS+=("$(printf '%s' "$w" | sed 's#[\\/:]#-#g')")
+    [ -n "$w" ] && CANDS+=("$(slug "$w")")
   done
 fi
 
@@ -50,7 +60,7 @@ done
 
 # 후보가 하나도 안 맞으면 경로 꼬리로 찾아본다. 슬러그 규칙을 모르는 환경 대비.
 if [ -z "$PROJ" ]; then
-  TAIL=$(printf '%s' "$DIR" | awk -F/ '{ n=NF; s=""; for (i=(n>2?n-2:1); i<=n; i++) if ($i != "") s = (s=="" ? $i : s "-" $i); print s }')
+  TAIL=$(slug "$(printf '%s' "$DIR" | awk -F/ '{ n=NF; s=""; for (i=(n>2?n-2:1); i<=n; i++) if ($i != "") s = (s=="" ? $i : s "-" $i); print s }')")
   MATCHES=$(find "$ROOT" -maxdepth 1 -mindepth 1 -type d -name "*$TAIL" 2>/dev/null)
   CNT=$(printf '%s\n' "$MATCHES" | grep -c . || true)
   if [ "$CNT" -eq 1 ]; then
