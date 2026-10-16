@@ -316,6 +316,7 @@ skill 밖으로 나오는 것은 파악이 끝나고 실제로 손을 대는 단
 
 ## PR / MR
 **`gh pr create` 직전에 제목과 본문 초안을 보여주고 승인받는다.** 승인 전에 만들지 않는다.
+릴리즈와 함께 요청된 PR 은 `release-cut` 5절에서 노트와 같이 받은 승인으로 갈음한다. 내용이 바뀌면 다시 묻는다.
 AI 스러운 템플릿(`## Summary`, `## Test plan`, 체크박스)과 `🤖 Generated with Claude Code` 문구를 쓰지 않는다.
 
 **공개 upstream PR·커밋에 내부 정보를 넣지 않는다.**
