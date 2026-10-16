@@ -284,7 +284,7 @@ skill 밖으로 나오는 것은 파악이 끝나고 실제로 손을 대는 단
 ## 연동 repo
 **커밋 직후,** 이 변경을 따라가야 하는 다른 repo 가 있는지 본다. 버전 태그를 찍었거나 배포했으면 반드시 본다.
 `<repo>/.claude/downstream.md` 가 있으면 그것을, 없으면 `shared/scripts/downstream-scan.sh` 로 후보를 훑는다.
-**보고만 하고 고치지 않는다** - 연동 repo 는 지시 범위 밖이다. 절차 → `shared/references/downstream.md`
+**보고만 하고 고치지 않는다** - 연동 repo 는 지시 범위 밖이다. 사용자가 그 repo 를 함께 지목했으면 반영까지 간다. 절차 → `shared/references/downstream.md`
 
 ## 산출물의 실질
 이미 있는 내용을 정리해서 내놓는 것은 산출물이 아니다. 형식만 맞고 실질이 없으면 그렇다고 말한다.
