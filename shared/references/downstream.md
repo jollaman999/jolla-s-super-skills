@@ -79,7 +79,7 @@ DOWNSTREAM_ROOTS=~/git/terraform ~/.claude/skills/shared/scripts/downstream-scan
 따라가야 하는 곳이다. `downstream-scan.sh` 는 repo 만 훑으므로 이런 것은 사람이 알려줘야 나온다.
 알려주면 그때 기록한다.
 
-호스트·계정은 여기 쓰지 않는다. 그건 `.claude/verify-targets.md` 다.
+호스트·계정은 여기 쓰지 않는다. 그건 repo 의 `.claude/verify-targets.md` 와, 여러 repo 에 걸친 전역 목록 `$CLAUDE_CONFIG_DIR/hosts.md` (기본 `~/.claude/hosts.md`) 다.
 비밀번호·토큰은 어느 파일에도 쓰지 않는다.
 
 ## 주로 이런 데서 어긋난다
