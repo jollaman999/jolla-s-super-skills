@@ -138,6 +138,7 @@ baseline 비교가 필요하면 `git worktree add` 로 별도 워킹트리를 �
 git add <내가 고친 파일들>        # git add -A 를 쓰지 않는다
 git diff --cached --stat          # 무엇이 들어가는지 확인
 ```
+내 변경의 빌드·의존성 정리 명령(`go mod tidy`, `npm install` 등)이 바꾼 lock·sum 파일(`go.sum`, `go.work.sum`, `package-lock.json` 등)은 내 변경분이라 같은 커밋에 넣는다. 빼는 것은 다른 세션이 만진 것뿐이다.
 동시 세션이 있을 때 브랜치 전환과 `reset --hard` 도 하지 않는다.
 
 zsh 는 따옴표 없는 변수를 단어 분할하지 않는다. `git checkout $FILES` 는 전체가 하나의 pathspec 이 되어 실패한다. 루프나 배열을 쓴다.
