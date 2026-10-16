@@ -582,6 +582,8 @@ TMO
     [ -n "$w" ] || continue
     printf '%s' "$answer" | grep -qF -- "$w" && why+=("답변에 '$w' 가 남음")
     hit=$(grep -rlF -- "$w" "$proj" 2>/dev/null | head -1)
+    # 설정 폴더(hosts.md, 메모리)도 본다. 세션 기록(*.jsonl)은 프롬프트에 든 값이 원래 남으니 뺀다
+    [ -n "$hit" ] || hit=$(grep -rlF --exclude='*.jsonl' --exclude='.credentials.json' -- "$w" "$cfg" 2>/dev/null | head -1)
     [ -n "$hit" ] && why+=("파일에 '$w' 가 남음: ${hit#$sandbox/}")
   done
 
