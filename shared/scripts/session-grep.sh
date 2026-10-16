@@ -71,6 +71,20 @@ NOT_HUMAN = ('<command-message>', '<command-name>', '<task-notification>',
              'This session is being continued', 'Base directory for this skill',
              'Caveat: The messages below', '[Request interrupted')
 
+# 출력에 비밀번호를 내지 않는다. 검색 결과는 그대로 이 세션 기록에 다시 남기 때문이다.
+# 키워드 뒤 값, "계정 / 값", "user@host 값" 꼴만 본다. 글자만으로 된 낱말은 코드·문장이라 안 가린다.
+SECRET = [
+    re.compile(r'((?:비번|비밀번호|패스워드|암호|password|passwd|pw|SSHPASS|token|토큰)\s*(?:은|는|:|=)?\s*[\'"]?)([^\s\'"`,)]{4,})', re.I),
+    re.compile(r'(\b(?:root|admin|administrator|superadmin|ubuntu|deploy)\s*/\s*)([^\s\'"`,)/]{4,})'),
+    re.compile(r'(\b[\w.-]+@[\w.-]+\s+)([^\s\'"`,)/]{6,})(?=\s)'),
+]
+def secretish(v):
+    return bool(re.search(r'[A-Za-z가-힣]', v) and re.search(r'[\d!@#$%^&*_+=-]', v))
+def mask(t):
+    for rx in SECRET:
+        t = rx.sub(lambda m: m.group(1) + ('***' if secretish(m.group(2)) else m.group(2)), t)
+    return t
+
 def texts(msg, want):
     """검색 대상 텍스트만 뽑는다. thinking(서명이 base64 라 오탐)과 tool_result 는 뺀다."""
     c = msg.get('content')
@@ -125,7 +139,7 @@ for f in files:
                     body = ('…' if a else '') + t[a:m.end() + ctx].replace('\n', ' ')
                     if m.end() + ctx < len(t):
                         body += '…'
-                hits.append((ts, proj, sid + sub, o['type'], body))
+                hits.append((ts, proj, sid + sub, o['type'], mask(body)))
     if matched_here:
         seen_files.append(f)
 
