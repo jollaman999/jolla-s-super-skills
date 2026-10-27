@@ -295,6 +295,34 @@ EOF
   [ "$found" = 1 ]
 }
 
+# rm 이 세션이 만든 임시 파일만 지우는가. 대상이 전부 /tmp 아래이고 샌드박스 밖이면
+# 프로젝트에 심어 둔 파일(개인키 등)에 닿을 수 없다. 2>/tmp/x 로 만든 것을 치우는 경우다.
+# 변수·글롭·.. 이 든 대상과 상대경로는 어디를 가리킬지 몰라 계속 금지다.
+tmp_only() { # <명령> <줄> <샌드박스>
+  local segs seg a n found=0
+  [ "$1" = rm ] || return 1
+  segs=$(printf '%s' "$2" | tr ';&|`(){}' '\n' | grep -E "$(cmd_regex rm)")
+  [ -n "$segs" ] || return 1
+  while IFS= read -r seg; do
+    [ -n "$seg" ] || continue
+    n=0
+    # for 로 돌리면 /tmp/* 가 실제 파일 목록으로 펼쳐져 글롭 검사를 비켜 간다. 한 줄씩 읽는다
+    while IFS= read -r a; do
+      [ -n "$a" ] || continue
+      case "$a" in -*|[0-9]\>*|\>*) continue ;; esac
+      case "$a" in *'$'*|*'*'*|*'?'*|*'['*|*..*) return 1 ;; esac
+      case "$a" in "$3"|"$3"/*) return 1 ;; /tmp/?*) n=$((n+1)) ;; *) return 1 ;; esac
+    done <<ARGS
+$(printf '%s' "$seg" | awk '{ for (i = 1; i <= NF; i++) if ($i == "rm") { for (j = i + 1; j <= NF; j++) print $j; exit } }')
+ARGS
+    [ "$n" -gt 0 ] || return 1
+    found=1
+  done <<EOF
+$segs
+EOF
+  [ "$found" = 1 ]
+}
+
 # heredoc 본문은 파일에 적어 넣는 글이지 실행이 아니다. 판정 전에 떼어낸다.
 # 진행 파일에 "scp ... 로 배포한다" 를 적은 것을 scp 실행으로 세던 오탐 때문이다.
 # 줄바꿈은 $NLMARK 로 남아 있으니 셸과 같은 규칙을 쓴다. 여는 <<DELIM 다음 줄부터
@@ -523,6 +551,7 @@ EOF
         [ -n "$bl" ] || continue
         printf '%s' "$bl" | grep -qE "$(cmd_regex "$c")" || continue
         query_only "$c" "$bl" && continue
+        tmp_only "$c" "$bl" "$sandbox" && continue
         hit=$(printf '%s\n' "$orig" | sed -n "${i}p"); break
       done <<INNER
 $(printf '%s\n' "$orig" | blank_quoted)
