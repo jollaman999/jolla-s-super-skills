@@ -5,7 +5,7 @@
 # usage: repo-profile.sh [repo] [n] [--save]
 #   repo   : 기본 $PWD
 #   n      : 분석할 커밋 수 (기본 200)
-#   --save : 결과를 <repo>/.claude/repo-profile.md 에 쓴다
+#   --save : 결과를 <repo>/.claude/repo-profile.md 에 쓴다. 추적 중인 파일이 아니면 .git/info/exclude 에 넣는다
 #
 # env: PROFILE_ME  내 이름/메일을 콤마로 추가 지정. git config 와 다른 계정으로 커밋한 repo 용
 #      예: PROFILE_ME="jollaman999,admin@example.com"
@@ -274,4 +274,13 @@ if [ "$SAVE" -eq 1 ]; then
   echo
   echo "저장: $TARGET"
   [ -f "$TARGET.bak" ] && echo "  이전 내용: $TARGET.bak"
+  # 내 커밋 규칙용 파일이라 남의 repo 에 올라가면 안 된다. 이미 추적 중이면 그 repo 가
+  # 일부러 넣은 것이니 두고, 아니면 .git/info/exclude 로 뺀다. .gitignore 는 남의 파일이라 안 고친다.
+  if ! g ls-files --error-unmatch -- .claude/repo-profile.md >/dev/null 2>&1 \
+     && ! g check-ignore -q -- .claude/repo-profile.md; then
+    EXC=$(g rev-parse --path-format=absolute --git-path info/exclude)
+    mkdir -p "$(dirname "$EXC")"
+    printf '/%s.claude/repo-profile.md*\n' "$(g rev-parse --show-prefix)" >> "$EXC"
+    echo "  git 에서 뺌: $EXC"
+  fi
 fi
