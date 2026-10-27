@@ -568,6 +568,8 @@ EOF
       i=$((i+1))
       printf '%s' "$bl" | grep -qE "$(cmd_regex "$c")" || continue
       printf '%s' "$bl" | grep -qE "$(cmd_regex_timeout "$c")" && continue
+      # ssh -G 처럼 접속하지 않는 형태는 걸릴 곳이 없어 timeout 도 필요 없다
+      query_only "$c" "$bl" && continue
       bare=$(printf '%s\n' "$bash_cmds" | sed -n "${i}p"); break
     done <<TMO
 $(printf '%s\n' "$bash_cmds" | blank_quoted)

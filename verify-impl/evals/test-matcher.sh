@@ -207,6 +207,8 @@ q() { # <기대: 예외|예외아님> <명령> <줄>
 # ssh - 붙지 않는 형태만 예외
 q 예외     ssh 'ssh -G gpu-node-01'
 q 예외     ssh 'ssh -V'
+# timeout필수 검사도 이 예외를 쓴다. 실제 세션 기록에서 오판했던 줄이다
+q 예외     ssh "getent hosts gpu-node-01.invalid; echo \"exit=\$?\"; ssh -G gpu-node-01.invalid 2>&1 | grep -Ei '^(hostname|port)'"
 q 예외아님 ssh 'ssh -n deploy@gpu-node-01 uptime'
 
 # docker - 로컬 데몬 조회는 예외
