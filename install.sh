@@ -257,17 +257,17 @@ hook_cmd() { # <설치위치>
 
 # JSON 을 손으로 자르지 않는다. settings.json 은 사용자 파일이고 남의 훅이 들어 있을 수 있다.
 # 쓸 도구가 없으면 2 를 내고 부르는 쪽이 안내만 한다. 조용히 틀리지 않는다.
-hook_edit() { # <settings.json> <add|remove> [명령]
+# 이벤트와 표식을 받는다. 표식은 명령 문자열 안에 든 낱말이고, 그 이벤트에서 표식이 든 항목만 내 것으로 본다.
+hook_edit() { # <settings.json> <add|remove> <이벤트> <표식> [명령] [timeout초]
   if   [ -n "$PY" ]; then hook_edit_py "$@"
   elif [ -n "$PS" ]; then hook_edit_ps "$@"
   else return 2; fi
 }
 
-hook_edit_py() { # <settings.json> <add|remove> [명령]
-  "$PY" - "$1" "$2" "${3:-}" <<'PYJSON'
+hook_edit_py() { # <settings.json> <add|remove> <이벤트> <표식> [명령] [timeout초]
+  "$PY" - "$1" "$2" "$3" "$4" "${5:-}" "${6:-5}" <<'PYJSON'
 import json, os, sys
-path, op, cmd = sys.argv[1], sys.argv[2], sys.argv[3]
-MARK = "check-install.sh"
+path, op, EVENT, MARK, cmd, tmo = sys.argv[1:7]
 try:
     with open(path, encoding="utf-8") as f:
         cfg = json.load(f)
@@ -278,7 +278,7 @@ except FileNotFoundError:
 except Exception:
     sys.exit(3)                       # 사람이 고쳐 둔 것을 덮어쓰지 않는다
 hooks = cfg.setdefault("hooks", {})
-lst = hooks.get("SessionStart") or []
+lst = hooks.get(EVENT) or []
 if not isinstance(lst, list):
     sys.exit(3)
 def mine(e):
@@ -286,11 +286,11 @@ def mine(e):
 lst = [e for e in lst if not mine(e)]              # 내가 넣은 것만 걷어낸다
 if op == "add":
     lst.append({"matcher": "",
-                "hooks": [{"type": "command", "command": cmd, "timeout": 5}]})
+                "hooks": [{"type": "command", "command": cmd, "timeout": int(tmo)}]})
 if lst:
-    hooks["SessionStart"] = lst
+    hooks[EVENT] = lst
 else:
-    hooks.pop("SessionStart", None)
+    hooks.pop(EVENT, None)
 if not hooks:
     cfg.pop("hooks", None)
 tmp = path + ".tmp"
@@ -303,13 +303,12 @@ PYJSON
 
 # PowerShell 판. Windows 에서 시험하지 못했다. 그래서 쓰고 나서 스스로 확인하고,
 # 이상하면 원본으로 되돌린 뒤 실패를 낸다. 부르는 쪽은 그때 안내만 하게 된다.
-hook_edit_ps() { # <settings.json> <add|remove> [명령]
-  local json="$1" op="$2" cmd="${3:-}" ps1 wj wp rc
+hook_edit_ps() { # <settings.json> <add|remove> <이벤트> <표식> [명령] [timeout초]
+  local json="$1" op="$2" ev="$3" mark="$4" cmd="${5:-}" tmo="${6:-5}" ps1 wj wp rc
   ps1=$(mktemp --suffix=.ps1 2>/dev/null || mktemp) || return 2
   cat > "$ps1" <<'PS1EOF'
-param([string]$Path, [string]$Op, [string]$Cmd)
+param([string]$Path, [string]$Op, [string]$Event, [string]$MARK, [string]$Cmd, [int]$Tmo = 5)
 $ErrorActionPreference = 'Stop'
-$MARK = 'check-install.sh'
 $bak  = "$Path.jolla-bak"
 try {
   if (Test-Path -LiteralPath $Path) {
@@ -324,7 +323,7 @@ function Has($o, $n) { return ($o.PSObject.Properties.Name -contains $n) }
 if (-not (Has $cfg 'hooks')) { $cfg | Add-Member -NotePropertyName hooks -NotePropertyValue (New-Object PSObject) }
 $hooks = $cfg.hooks
 $list = @()
-if ((Has $hooks 'SessionStart') -and $hooks.SessionStart) { $list = @($hooks.SessionStart) }
+if ((Has $hooks $Event) -and $hooks.$Event) { $list = @($hooks.$Event) }
 
 $kept = New-Object System.Collections.ArrayList
 foreach ($e in $list) {
@@ -338,7 +337,7 @@ if ($Op -eq 'add') {
   $inner = New-Object PSObject
   $inner | Add-Member -NotePropertyName type    -NotePropertyValue 'command'
   $inner | Add-Member -NotePropertyName command -NotePropertyValue $Cmd
-  $inner | Add-Member -NotePropertyName timeout -NotePropertyValue 5
+  $inner | Add-Member -NotePropertyName timeout -NotePropertyValue $Tmo
   $entry = New-Object PSObject
   $entry | Add-Member -NotePropertyName matcher -NotePropertyValue ''
   $entry | Add-Member -NotePropertyName hooks   -NotePropertyValue @($inner)
@@ -346,9 +345,9 @@ if ($Op -eq 'add') {
 }
 if ($kept.Count -gt 0) {
   $arr = [object[]]$kept.ToArray()
-  if (Has $hooks 'SessionStart') { $hooks.SessionStart = $arr }
-  else { $hooks | Add-Member -NotePropertyName SessionStart -NotePropertyValue $arr }
-} elseif (Has $hooks 'SessionStart') { $hooks.PSObject.Properties.Remove('SessionStart') }
+  if (Has $hooks $Event) { $hooks.$Event = $arr }
+  else { $hooks | Add-Member -NotePropertyName $Event -NotePropertyValue $arr }
+} elseif (Has $hooks $Event) { $hooks.PSObject.Properties.Remove($Event) }
 if ($hooks.PSObject.Properties.Name.Count -eq 0) { $cfg.PSObject.Properties.Remove('hooks') }
 
 $tmp = "$Path.tmp"
@@ -364,7 +363,7 @@ try {
   $back = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
   $null = $back | ConvertFrom-Json
   $hasMark  = $back.Contains($MARK)
-  $isArray  = ($back -match '"SessionStart"\s*:\s*\[')
+  $isArray  = ($back -match ('"' + [regex]::Escape($Event) + '"\s*:\s*\['))
   if ($Op -eq 'add')    { $ok = ($hasMark -and $isArray) }
   else                  { $ok = (-not $hasMark) }
 } catch { $ok = $false }
@@ -382,7 +381,7 @@ PS1EOF
   else
     wj="$json"; wp="$ps1"
   fi
-  "$PS" -NoProfile -ExecutionPolicy Bypass -File "$wp" -Path "$wj" -Op "$op" -Cmd "$cmd"
+  "$PS" -NoProfile -ExecutionPolicy Bypass -File "$wp" -Path "$wj" -Op "$op" -Event "$ev" -MARK "$mark" -Cmd "$cmd" -Tmo "$tmo"
   rc=$?
   rm -f "$ps1"
   return "$rc"
@@ -418,7 +417,7 @@ if [ "$UNINSTALL" -eq 1 ]; then
     done < <(sed -n 's/^path=//p' "$MANIFEST")
     if grep -qxF "hook=SessionStart" "$MANIFEST" 2>/dev/null; then
       if [ "$DRY" -eq 1 ]; then say "  제거   settings.json 의 SessionStart 훅"
-      elif hook_edit "$DEST/settings.json" remove; then say "  제거   settings.json 의 SessionStart 훅"
+      elif hook_edit "$DEST/settings.json" remove SessionStart check-install.sh; then say "  제거   settings.json 의 SessionStart 훅"
       else say "  건너뜀 settings.json 의 SessionStart 훅  (고칠 도구가 없거나 읽을 수 없음). 직접 지우세요"; fi
     fi
     run rm -f "$MANIFEST"
@@ -635,7 +634,7 @@ else
     printf '%s' "  $SET 에 넣을까요? [Y/n]: "; read -r a || a=""
     case "${a:-y}" in
       [Nn]*) say "  넣지 않았습니다. 직접 볼 때: $DEST/skills/shared/scripts/check-install.sh" ;;
-      *)     if hook_edit "$SET" add "$(hook_cmd "$DEST")"; then
+      *)     if hook_edit "$SET" add SessionStart check-install.sh "$(hook_cmd "$DEST")"; then
                echo "hook=SessionStart" >> "$MANIFEST"
                say "  넣었습니다: $SET"
              else
