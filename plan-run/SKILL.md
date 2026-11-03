@@ -170,6 +170,8 @@ worktree 로 띄울 때 알아 둘 것.
 | 무엇 | 어떻게 |
 |------|--------|
 | 어디에 생기나 | `<repo>/.claude/worktrees/agent-<id>`, 브랜치 `worktree-agent-<id>`. 완료 알림의 `worktreePath` 에 경로가 온다 |
+| 어느 커밋에서 시작하나 | **로컬 HEAD 가 아니라 `origin/main` 이다.** push 안 한 앞 작업의 커밋이 팀원 트리에 없다. 앞 작업 결과를 쓰는 팀원을 띄우기 전에 push 하거나, 순차로 간다 (2026-11-03 실측: HEAD `ecf077f` 에서 띄웠는데 worktree 는 push 전 `origin/main` 인 `f8b164e`) |
+| 메인 repo 절대경로 | Write·Edit 는 메인 쪽 경로를 거절하고 worktree 쪽을 고치라고 답한다 (2026-11-03 실측). Bash 로 쓰는 것은 막히는지 확인 안 했다. 팀원에게 넘기는 경로는 repo 기준 상대경로로 쓰고, 가져오기 전에 메인의 `git status` 를 본다 |
 | 메인 워킹트리에서 | `?? .claude/worktrees/` 로 보인다. **`git add -A` 를 하면 들어간다.** 경로를 지정해 add 한다 |
 | 가져오기 | `git -C <worktreePath> diff > p && git apply --3way p`. **결과가 스테이지까지 된다** - 확인은 `git diff --cached` 로 한다 |
 | 충돌 | exit 1, 파일에 충돌 표시가 남고 `UU` 가 된다. `git checkout HEAD -- <파일>` 로 그 시도를 되돌린다 |
