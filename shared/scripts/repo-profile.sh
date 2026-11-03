@@ -10,7 +10,7 @@
 # env: PROFILE_ME  내 이름/메일을 콤마로 추가 지정. git config 와 다른 계정으로 커밋한 repo 용
 #      예: PROFILE_ME="jollaman999,admin@example.com"
 #
-# exit: 0=정상  2=repo 아님/커밋 없음
+# exit: 0=정상  2=repo 아님/커밋 없음 (커밋이 없으면 첫 커밋에 찍힐 계정을 stderr 로 낸다)
 #
 # 남의 repo(클론해 둔 남의 프로젝트)에서 실행하면 그 repo 의 관례가 나온다.
 # 그것을 내 스타일로 착각하지 않도록 소유 판정을 먼저 하고 결과에 표시한다.
@@ -76,7 +76,28 @@ fi
 SUBJ=$(g log "${AUTHOPT[@]}" --no-merges -n "$N" --format='%s' 2>/dev/null \
        | grep -vE '^(Revert |Reapply |Merge |fixup! |squash! )')
 TOTAL=$(printf '%s\n' "$SUBJ" | grep -c . )
-[ "$TOTAL" -eq 0 ] && { echo "분석할 커밋이 없습니다: $DIR" >&2; exit 2; }
+if [ "$TOTAL" -eq 0 ]; then
+  # 커밋이 없으면 따라갈 관례가 없다. 대신 첫 커밋에 찍힐 계정을 보여 준다.
+  # 회사 계정이 전역 설정이고 개인 GitHub 에 올리는 repo 면 그대로 커밋하면 회사 계정으로 찍힌다.
+  echo "분석할 커밋이 없습니다: $DIR" >&2
+  {
+    echo "첫 커밋에 찍힐 계정:"
+    for k in user.name user.email; do
+      line=$(g config --show-origin --get "$k" 2>/dev/null)
+      if [ -n "$line" ]; then
+        src=${line%%$'\t'*}; val=${line#*$'\t'}
+        case "$src" in "file:.git/config") src="이 repo" ;; *) src="전역 (${src#file:})" ;; esac
+        printf '  %-10s %s   <- %s 설정\n' "$k" "$val" "$src"
+      else
+        printf '  %-10s (설정 없음)\n' "$k"
+      fi
+    done
+    echo "  remote     ${RURL:-없음}"
+    [ -n "$ROWNER" ] && echo "  remote 소유자 $ROWNER"
+    echo "이 계정으로 커밋할지 사용자에게 물어본다. 바꾸려면: git -C $DIR config user.name ... / user.email ..."
+  } >&2
+  exit 2
+fi
 
 # --- 커밋: 언어 ---
 KO=$(printf '%s\n' "$SUBJ" | grep -cE '[가-힣]')
