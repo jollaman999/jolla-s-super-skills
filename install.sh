@@ -251,6 +251,12 @@ MANIFEST="$DEST/$MANIFEST_NAME"
 
 # 훅 명령은 반드시 0 으로 끝난다. 0 이 아니면 Claude Code 가 그 출력을 모델에 싣지 않는다
 # (실측: echo 만 하는 훅은 닿고, 종료 코드 1 을 내는 훅은 안 닿았다).
+# 도구를 부르기 직전 글이 사용자 언어와 다르면 같은 턴 안에서 모델에게 알린다 (lang-guard.py).
+# python 으로 기록을 읽으므로 python 이 있을 때만 건다.
+lang_cmd() { # <설치위치>
+  printf 'P="%s/skills/shared/scripts/lang-guard.py"; [ -f "$P" ] && %s "$P"; exit 0' "$1" "$PY"
+}
+
 hook_cmd() { # <설치위치>
   printf 'S="%s/skills/shared/scripts/check-install.sh"; if [ -x "$S" ]; then "$S" --quiet "%s" || true; else echo "skills 설치가 깨졌습니다: 검사 스크립트에 닿지 못합니다 (%s/skills/shared). repo 를 옮겼거나 지웠는지 보세요"; fi; exit 0' "$1" "$1" "$1"
 }
@@ -419,6 +425,11 @@ if [ "$UNINSTALL" -eq 1 ]; then
       if [ "$DRY" -eq 1 ]; then say "  제거   settings.json 의 SessionStart 훅"
       elif hook_edit "$DEST/settings.json" remove SessionStart check-install.sh; then say "  제거   settings.json 의 SessionStart 훅"
       else say "  건너뜀 settings.json 의 SessionStart 훅  (고칠 도구가 없거나 읽을 수 없음). 직접 지우세요"; fi
+    fi
+    if grep -qxF "hook=PostToolUse" "$MANIFEST" 2>/dev/null; then
+      if [ "$DRY" -eq 1 ]; then say "  제거   settings.json 의 PostToolUse 훅 (lang-guard)"
+      elif hook_edit "$DEST/settings.json" remove PostToolUse lang-guard.py; then say "  제거   settings.json 의 PostToolUse 훅 (lang-guard)"
+      else say "  건너뜀 settings.json 의 PostToolUse 훅 (lang-guard)  (고칠 도구가 없거나 읽을 수 없음). 직접 지우세요"; fi
     fi
     run rm -f "$MANIFEST"
     # 비게 된 디렉터리만 정리한다. rmdir 은 비지 않은 것은 건드리지 않는다.
@@ -636,6 +647,40 @@ else
       [Nn]*) say "  넣지 않았습니다. 직접 볼 때: $DEST/skills/shared/scripts/check-install.sh" ;;
       *)     if hook_edit "$SET" add SessionStart check-install.sh "$(hook_cmd "$DEST")"; then
                echo "hook=SessionStart" >> "$MANIFEST"
+               say "  넣었습니다: $SET"
+             else
+               say "  넣지 못했습니다 (설정 파일을 읽을 수 없거나 도구가 없습니다). 그대로 두었습니다."
+             fi ;;
+    esac
+  fi
+fi
+
+# --- 언어 훅 (물어보고 넣는다) ---
+# 규칙 문서만으로는 짧은 진행 줄이 영어로 샌다. 새는 순간 같은 턴 안에서 되돌려 준다.
+if grep -q "lang-guard.py" "$SET" 2>/dev/null; then
+  :
+elif [ "$DRY" -eq 1 ]; then
+  say
+  say "  (dry-run) 언어 훅(PostToolUse)을 걸지 물었을 것입니다"
+elif [ -z "$PY" ]; then
+  say
+  say "  python 이 없어 언어 훅(lang-guard)은 걸지 않습니다."
+else
+  say
+  say "답하는 언어가 사용자 언어와 어긋나면 바로 알려주는 훅을 걸 수 있습니다."
+  say "  하는 일: 도구를 부를 때마다 바로 앞 글을 보고, 한국어로 대화 중인데 영어 문장이면 모델에게 알린다"
+  say "  읽기만 하고, 네트워크 없음. 어긋났을 때만 말합니다"
+  if ! ask; then
+    say
+    if [ "$YES" -eq 1 ]; then say "  --yes 라 묻지 않고 건너뛰었습니다."
+    else                      say "  터미널이 아니라 물어볼 수 없어 건너뛰었습니다."; fi
+  else
+    a=y
+    printf '%s' "  $SET 에 넣을까요? [Y/n]: "; read -r a || a=""
+    case "${a:-y}" in
+      [Nn]*) say "  넣지 않았습니다." ;;
+      *)     if hook_edit "$SET" add PostToolUse lang-guard.py "$(lang_cmd "$DEST")" 5; then
+               echo "hook=PostToolUse" >> "$MANIFEST"
                say "  넣었습니다: $SET"
              else
                say "  넣지 못했습니다 (설정 파일을 읽을 수 없거나 도구가 없습니다). 그대로 두었습니다."
