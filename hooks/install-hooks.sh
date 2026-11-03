@@ -3,7 +3,8 @@
 #
 # usage: install-hooks.sh <repo> [public|private]
 #        install-hooks.sh <repo> --uninstall
-#   프로필을 안 주면 gh 로 공개 여부를 확인해 정한다. 확인 불가면 private.
+#   프로필을 안 주면 gh 로 공개 여부를 확인해 정한다. 확인 불가면 경고하고 private.
+#   직접 준 프로필은 .profile-pinned 로 표시해 pre-commit 이 다시 확인하지 않는다.
 #     public  = 시크릿 + 내부 조직명 + 사설IP 차단
 #     private = 시크릿(비밀번호·토큰·개인키)만 차단
 #   em dash 와 커밋 메시지 규칙은 프로필과 무관하게 항상 검사한다.
@@ -22,6 +23,8 @@ DIR="${1:?usage: install-hooks.sh <repo> [public|private|--uninstall]}"
 WANT="${2:-}"
 MODE=install
 [ "$WANT" = "--uninstall" ] && { MODE=uninstall; WANT=""; }
+PINNED=0
+[ -n "$WANT" ] && PINNED=1
 
 DIR=$(cd "$DIR" 2>/dev/null && pwd -P) || { echo "경로 없음: $1" >&2; exit 2; }
 GITDIR=$(git -C "$DIR" rev-parse --git-dir 2>/dev/null) || { echo "git repo 아님: $DIR" >&2; exit 2; }
@@ -40,6 +43,13 @@ if [ "$MODE" = install ] && [ -z "$WANT" ]; then
     [ -n "$vis" ] && echo "  gh 확인: $slug = $vis"
   fi
   [ -z "$RURL" ] && echo "  remote 없음 -> private"
+  # 확인을 못 해서 private 로 간 것을 확인해서 private 인 것과 같은 출력으로 두지 않는다.
+  if [ -n "$RURL" ] && [ -z "${vis:-}" ]; then
+    command -v gh >/dev/null 2>&1 && why="gh 가 공개 여부를 답하지 못함" || why="gh 없음"
+    echo "  경고: $why -> 확인 없이 private 로 둡니다"
+    echo "        공개 repo 면 다시 실행하세요: $0 $DIR public"
+    echo "        커밋할 때 하루 한 번 다시 확인해서, 공개로 나오면 커밋을 막고 알립니다"
+  fi
 fi
 [ "$MODE" = install ] && { case "$WANT" in public|private) ;; *) echo "프로필은 public 또는 private" >&2; exit 2 ;; esac; }
 
@@ -106,6 +116,7 @@ if [ "$MODE" = uninstall ]; then
   uninstall_hook pre-commit
   uninstall_hook commit-msg
   [ -f "$HOOKS/.profile" ] && { rm -f "$HOOKS/.profile"; echo "  .profile: 제거"; }
+  rm -f "$HOOKS/.profile-pinned" "$HOOKS/.visibility-checked"
   if [ -f "$HOOKS/.org-patterns" ]; then
     echo "  .org-patterns: 사용자가 쓴 목록이라 그대로 둡니다 ($HOOKS/.org-patterns)"
   fi
@@ -145,6 +156,10 @@ install_hook pre-commit
 install_hook commit-msg
 
 printf '%s\n' "$WANT" > "$HOOKS/.profile"
+# 프로필이 바뀌었으니 pre-commit 의 공개 여부 재확인 기록은 버린다.
+rm -f "$HOOKS/.visibility-checked"
+# 직접 지정한 프로필은 pre-commit 이 다시 확인하지 않는다.
+if [ "$PINNED" -eq 1 ]; then : > "$HOOKS/.profile-pinned"; else rm -f "$HOOKS/.profile-pinned"; fi
 echo "설치 완료: $DIR"
 echo "  훅:     $HOOKS/{pre-commit,commit-msg}"
 echo "  프로필: $WANT"

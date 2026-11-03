@@ -23,6 +23,39 @@ fi
 [ -z "$PROFILE" ] && PROFILE=private
 red(){ printf '\033[31m%s\033[0m\n' "$*"; }
 
+# private 로 적힌 repo 가 그 뒤에 공개됐는지 하루 한 번 gh 로 다시 본다.
+# 설치할 때 repo 가 아직 비공개였거나 gh 가 답을 못 했으면 .profile 은 private 로 남고,
+# 공개된 뒤에도 사설 IP·조직명 검사가 꺼진 채 커밋이 나간다.
+# gh 가 PUBLIC 이라고 답할 때만 막는다. 답이 없으면(오프라인, 권한 없음, timeout 없음) 그냥 둔다.
+# 설치할 때 private 를 직접 지정했으면(.profile-pinned) 다시 보지 않는다.
+VISCHECK_PUBLIC=0
+if [ -z "${HOOK_PROFILE:-}" ] && [ "$PROFILE" = private ] && [ ! -f "$GITDIR/hooks/.profile-pinned" ]; then
+  VCACHE="$GITDIR/hooks/.visibility-checked"
+  TODAY=$(date +%Y-%m-%d)
+  LAST=$(head -1 "$VCACHE" 2>/dev/null || true)
+  if [ "${LAST%% *}" = "$TODAY" ]; then
+    VIS="${LAST#* }"
+  else
+    VIS=unknown
+    RURL=$(git remote get-url origin 2>/dev/null || true)
+    case "$RURL" in
+      *github.com[:/]*)
+        if command -v gh >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1; then
+          slug=$(printf '%s' "$RURL" | sed -E 's#\.git$##' | sed -E 's#^.*[:/]([^/:]+/[^/]+)$#\1#')
+          v=$(GH_HOST=github.com timeout 5 gh repo view "$slug" --json visibility -q .visibility 2>/dev/null | tr 'A-Z' 'a-z')
+          [ -n "$v" ] && VIS="$v"
+        fi
+        ;;
+    esac
+    printf '%s %s\n' "$TODAY" "$VIS" > "$VCACHE" 2>/dev/null || true
+  fi
+  if [ "$VIS" = public ]; then
+    VISCHECK_PUBLIC=1
+    # 공개 repo 기준으로 무엇이 걸리는지 이번 커밋에서 바로 보이게 public 검사로 돌린다.
+    PROFILE=public
+  fi
+fi
+
 # 훅 자신은 검사 대상에서 뺀다 - 탐지 패턴이 곧 금지 문자열이라 자기를 차단한다.
 # 다른 예외를 추가하려면 정말 필요한지 먼저 따진다.
 #
@@ -349,6 +382,15 @@ if printf '%s\n' "${STAGED[@]}" | grep -qE '(^|/)(CLAUDE\.md|SKILL\.md)$'; then
     fi
     echo "       돌릴지는 직접 정하세요. 커밋은 그대로 됩니다."
   fi
+fi
+
+if [ "$VISCHECK_PUBLIC" -eq 1 ]; then
+  FAIL=1
+  echo
+  red "[프로필] 이 repo 는 GitHub 에서 공개인데 훅 프로필이 private 로 적혀 있습니다."
+  echo "         공개 repo 기준(조직명·사설 IP 포함)으로 위 검사를 돌렸습니다."
+  echo "         프로필을 고치세요: ~/.claude/skills/hooks/install-hooks.sh $TOPDIR public"
+  echo "         일부러 private 로 두려면: ~/.claude/skills/hooks/install-hooks.sh $TOPDIR private"
 fi
 
 if [ $FAIL -ne 0 ]; then
