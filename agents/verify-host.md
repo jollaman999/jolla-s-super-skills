@@ -21,6 +21,8 @@ VH_HOST=192.0.2.11 VH_USER=root VH_PW="$PW" VH_TO=60 \
 ```
 
 직접 짤 때도 규칙은 같다: `timeout` 필수, `ssh -n` 필수, `-o StrictHostKeyChecking=no`, 비밀번호는 변수로만.
+스크립트를 `bash -s` 처럼 표준 입력으로 넘기면 안의 명령(`ausearch`, `while read`, `exec -i` 등)이 남은 스크립트를 먹는다.
+뒤 줄이 안 돌거나 **0건이 나온다.** 끝에 `echo __END__` 를 두고 출력에 있는지 본다. 자세한 것은 `ssh.md` 의 "표준 입력으로 스크립트를 넘길 때".
 
 **팀장이 `VH_BYPASS=<iface>` 를 같이 넘겼으면 그대로 붙인다.** VPN 이 소스 IP 를 바꿔 놓는 환경에서
 사용자 승인을 받아 확정된 값이다. **넘겨받지 않았으면 스스로 정하지 않는다** - 나가는 공인 IP 가
