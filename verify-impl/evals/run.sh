@@ -45,7 +45,47 @@ while [ $# -gt 0 ]; do
 done
 
 [ "$RESCORE" -eq 1 ] || command -v claude >/dev/null || { echo "claude 가 PATH 에 없습니다" >&2; exit 2; }
-command -v jq     >/dev/null || { echo "jq 가 없습니다" >&2; exit 2; }
+# jq 를 찾아 쓸 수 있게 한다. 없으면 Windows 에서는 winget 으로 설치할지 묻는다.
+# winget 으로 깐 jq 는 터미널을 다시 열어야 PATH 에 잡히므로, 설치 위치를 직접 찾아
+# 이번 실행의 PATH 에 넣는다. 묻지 못하는 실행(백그라운드, claude -p)에서는 깔지 않는다.
+ensure_jq() {
+  command -v jq >/dev/null 2>&1 && return 0
+  case "$(uname -s 2>/dev/null)" in
+    MINGW*|MSYS*|CYGWIN*) ;;
+    *) echo "jq 가 없습니다. 설치: apt install jq / dnf install jq / brew install jq" >&2; return 1 ;;
+  esac
+  local la d
+  la="${LOCALAPPDATA:-$HOME/AppData/Local}"
+  command -v cygpath >/dev/null 2>&1 && la=$(cygpath -u "$la")
+  find_winget_jq() {
+    for d in "$la"/Microsoft/WinGet/Links "$la"/Microsoft/WinGet/Packages/jqlang.jq_*; do
+      if [ -x "$d/jq.exe" ]; then PATH="$d:$PATH"; export PATH; return 0; fi
+    done
+    return 1
+  }
+  find_winget_jq && return 0
+  if ! command -v winget >/dev/null 2>&1; then
+    echo "jq 가 없고 winget 도 없습니다. https://jqlang.org/download/ 에서 jq.exe 를 받아 PATH 에 넣으세요" >&2
+    return 1
+  fi
+  if [ ! -t 0 ]; then
+    echo "jq 가 없습니다. 입력을 받을 수 없는 실행이라 설치하지 않습니다. 직접 설치: winget install --id jqlang.jq -e" >&2
+    return 1
+  fi
+  local ans
+  printf 'jq 가 없습니다. winget 으로 설치할까요? [Y/n]: ' >&2
+  read -r ans || ans=n
+  case "$ans" in
+    ""|[Yy]*) ;;
+    *) echo "설치하지 않았습니다. 직접 설치: winget install --id jqlang.jq -e" >&2; return 1 ;;
+  esac
+  winget install --id jqlang.jq -e --accept-source-agreements --accept-package-agreements >&2 || {
+    echo "winget 설치가 실패했습니다" >&2; return 1; }
+  find_winget_jq && return 0
+  echo "설치는 끝났지만 jq.exe 를 찾지 못했습니다. 터미널을 다시 열고 실행하세요" >&2
+  return 1
+}
+ensure_jq || exit 2
 
 # Windows 판 jq 는 줄 끝을 CRLF 로 낸다. 그대로 두면 판별기의 문자열 비교가 전부 어긋난다.
 # -b 는 Windows 판에만 있는 옵션이라 그때만 붙인다.
