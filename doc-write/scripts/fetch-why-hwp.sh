@@ -25,7 +25,7 @@ set -uo pipefail
 
 REPO_SLUG="jollaman999/why-hwp"
 # skill 문서가 기대하는 명령이 들어간 첫 버전. 이보다 낮으면 쓰지 않는다.
-MIN_VERSION="v0.1.0"
+MIN_VERSION="v0.2.0"
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST="$(dirname "$HERE")/bin"
