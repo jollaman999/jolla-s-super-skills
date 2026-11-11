@@ -415,7 +415,13 @@ run_once() { # <케이스이름> <규칙파일> <프롬프트파일>
   mkdir -p "$cfg" "$proj"
   [ -f "$CREDS" ] && { cp "$CREDS" "$cfg/.credentials.json"; chmod 600 "$cfg/.credentials.json"; }
 
-  CLAUDE_CONFIG_DIR="$cfg" "$REPO/install.sh" --global --yes >"$sandbox/install.log" 2>&1 || {
+  # 개발자 모드가 꺼진 Windows 는 심볼릭 링크를 못 만든다. 임시 설치라 복사로 충분하다.
+  local copy=()
+  if ! ( cd "$sandbox" && : > .lt && MSYS=winsymlinks:nativestrict CYGWIN=winsymlinks:nativestrict ln -s .lt .lk ) 2>/dev/null; then
+    copy=(--copy)
+  fi
+  rm -f "$sandbox/.lt" "$sandbox/.lk"
+  CLAUDE_CONFIG_DIR="$cfg" "$REPO/install.sh" --global --yes "${copy[@]}" >"$sandbox/install.log" 2>&1 || {
     printf 'R:설치 오류 (%s)\n' "$sandbox/install.log"; return; }
 
   # 케이스가 가짜 프로젝트를 요구하면 만들어 둔다
