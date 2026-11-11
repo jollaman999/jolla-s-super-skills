@@ -1,0 +1,20 @@
+# 우분투 커널 트리를 흉내 낸 최소 프로젝트. 버전 표기는 Makefile 과 debian changelog 두 곳에 있다.
+. "$(dirname "$0")/_fixtures.sh"
+cat > Makefile <<'MK'
+# SPDX-License-Identifier: GPL-2.0
+VERSION = 7
+PATCHLEVEL = 3
+SUBLEVEL = 0
+EXTRAVERSION =
+NAME = Baby Opossum Posse
+MK
+mkdir -p debian.master
+cat > debian.master/changelog <<'CL'
+linux (7.3.0-21.21) questing; urgency=medium
+
+  * Rebase to Ubuntu-7.3.0-11.12
+  * stable: v7.3.2, v7.3.3
+
+ -- builder <builder@example.invalid>  Thu, 06 Nov 2026 10:00:00 +0900
+CL
+fx_commit
