@@ -79,8 +79,7 @@ WH=$(bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh --which) || echo "
 
 | 자료 | 여는 법 |
 |------|---------|
-| `.hwpx`, `.docx` | `"$WH" text <파일>`, `"$WH" info <파일>` |
-| `.hwp` | `text`·`info` 가 아직 못 읽는다. 한글이 깔린 Windows 면 `"$WH" convert -to hwpx -o <사본> <파일>` 로 사본을 만들어 읽는다. 아니면 hwpx 나 pdf 로 달라고 한다 (`hwp.md`) |
+| `.hwpx`, `.hwp`, `.docx` | `"$WH" text <파일>`, `"$WH" info <파일>`. 변경 추적이 있으면 `-view original`·`markup` 도 본다 (`hwp.md` 2절) |
 | 양식 모양 | 한글이 깔린 Windows 면 `"$WH" convert -to pdf` 로 PDF 를 만들어 Read 로 쪽을 본다 |
 | `.pdf`, 이미지 | Read (PDF 는 `pages` 로 나눠 읽는다) |
 | `.pptx` | zip 이다. `unzip -l` 로 슬라이드 목록, `unzip -p <파일> ppt/slides/slideN.xml` 의 `<a:t>` 가 글자다 |
@@ -169,7 +168,7 @@ WH=$(bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh --which) || echo "
 | txt (메일 등) | 마크다운 기호 없이 |
 | hwp/hwpx | `references/hwp.md`. 원본은 복사해서 사본을 고친다 |
 | pptx | 지정 템플릿 덱을 복사해서 고친다. 처음부터 새로 만들지 않는다 |
-| docx | 양식 사본을 고친다. 고치는 도구가 없으면 md 로 쓰고 옮길 위치 표를 같이 낸다 |
+| docx | 양식 사본을 고친다. 고칠 도구(docx skill 등)가 없으면 그렇다고 알리고, md 와 옮길 위치 표로 대신할지 **물어서 승인받은 뒤** 만든다. 승인 전에는 대체물을 최종 산출물로 내지 않는다 |
 
 **사용자가 말한 형식 그대로 낸다.** "txt" 면 txt, "계단식" 이면 `-` 들여쓰기, "뽑아" 면 파일이다.
 
@@ -177,10 +176,10 @@ WH=$(bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh --which) || echo "
 
 | 검사 | 어떻게 | 근거 |
 |------|--------|------|
-| 원본 대비 | hwp/hwpx 는 `text` 를 원본과 고친 본에서 뽑아 diff. 남의 칸·메모·변경 추적 수가 그대로인지 `info` 로 | 남의 몫 보존 |
+| 원본 대비 | hwp/hwpx 는 `"$WH" verify -orig 원본 -allow 우리칸.txt 결과`. 남의 칸과 메모는 그대로, 원본의 변경 추적은 하나도 사라지지 않고, 이번 편집은 새 변경 추적으로 늘었는지를 **따로** 본다 (`hwp.md` 5절) | 남의 몫 보존 |
 | 양식 칸 | 체크리스트의 칸이 전부 채워졌거나 "협의 필요"·"원본 확인 필요" 로 표시됐는지 | 양식 따르기 |
 | 수치 | 문서의 수치마다 근거 자료의 값과 대조 | 수치는 약속이다 |
-| 금지어·내부 이름 | 공개 문서면 내부 이름 목록으로 본문과 그림 원본을 grep. 0건. 그림·캡처 속 글자는 grep 에 안 잡히니 눈으로 | 공개 노출 |
+| 금지어·내부 이름 | 공개 문서면 내부 이름 목록으로 본문과 그림 원본을 grep. 0건. 그림·캡처 속 글자는 grep 에 안 잡히니 눈으로. **화면에 안 보이는 곳도 본다**: hwp/hwpx 의 메모·지운 글·머리말(`hwp.md` 5절), pptx·docx 의 `media/` 원본 이미지와 슬라이드 노트·숨긴 개체(`writing.md` 4절) | 공개 노출 |
 | 그림 | 바꾼 그림을 전부 렌더해 열어 본다. 화살표·겹침·잘림·줄 수 (`figures.md` 9절) | 렌더해서 본다 |
 | 경로 | 문서 안 그림·링크가 문서 폴더 기준으로 실제 파일에 닿는지 | 그림 깨짐 |
 | 메타 블록 | 제목 바로 아래 대상·작성일·범위 블록이 없는지 | 최종본 |
@@ -215,7 +214,7 @@ WH=$(bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh --which) || echo "
 | 사용자에게 낼 산출물 | 스크래치패드에 두지 않는다. 사용자가 말한 폴더, 없으면 자료 폴더나 repo 안 |
 | git 밖 | 경로와 함께 "지우면 되살릴 수 없다" 를 알린다 |
 | 잠긴 파일 (한글·오피스가 열고 있음) | 알리고 다른 이름으로 저장한다. 남의 프로세스를 끝내지 않는다 |
-| 클라우드 동기화 폴더 (OneDrive 등) | 임시 폴더에 저장한 뒤 복사하고 md5 로 같은지 본다 (`hwp.md` 7절) |
+| 클라우드 동기화 폴더 (OneDrive 등) | 임시 폴더에 저장한 뒤 복사하고 md5 로 같은지 본다 (`hwp.md` 6절) |
 | 캡처 | 새 이름으로 찍는다. 성공한 캡처를 덮어쓰지 않는다 |
 
 ## 하지 말 것

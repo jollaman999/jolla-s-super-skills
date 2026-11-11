@@ -17,83 +17,99 @@ WH=$(bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh --which) || echo "
 
 없으면 `bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh` 로 받는다. 못 받으면 hwp 작업을 못 한다고 알리고 멈춘다.
 
-## 2. 지금 있는 명령
+## 2. 명령
 
 | 명령 | 하는 일 | 플랫폼 |
 |------|---------|--------|
-| `text [-format plain\|json] <파일>` | `.hwpx`·`.docx` 글을 `<위치><TAB><글>` 로. `s0/p12` 는 0번 구역 12번 문단, `s0/p3/t0/r1/c2` 는 3번 문단 첫 표의 1행 2열. 메모·머리말·꼬리말·각주는 빠진다 | 전부 |
-| `info [-format plain\|json] <파일>` | 구역·문단 수, 표와 크기, `(A)`·`(A/B)` 담당 표기와 위치, 메모, 변경 추적, 스타일, 그림 | 전부 |
+| `text [-format plain\|json] [-view accepted\|original\|markup] <파일>` | `.hwpx`·`.hwp`·`.docx` 글을 `<위치><TAB><글>` 로. `s0/p12` 는 0번 구역 12번 문단, `s0/p3/t0/r1/c2` 는 3번 문단 첫 표의 1행 2열. **메모 본문·머리말·꼬리말·각주는 빠진다** | 전부 |
+| `info [-format plain\|json] [-view ...] <파일>` | 구역·문단 수, 표와 크기, `(A)`·`(A/B)` 담당 표기와 위치, 메모(본문 포함), 변경 추적 수, 스타일, 그림 | 전부 |
+| `apply -spec 편집.json -o 결과.hwpx -author 이름 [-no-track] <입력.hwpx>` | 편집을 변경 추적으로 남긴 사본을 만든다. 4절 | 전부 |
+| `verify [-orig 원본] [-allow 위치.txt] [-banned 금지어.txt] <파일>` | 원본 대비 바뀐 곳, 사라진 메모·표·그림·변경 추적, 금지어, em dash. 위반이면 종료 코드 1. 5절 | 전부 |
 | `convert [-to hwp\|hwpx\|pdf\|txt] [-o 출력] [-force] <입력>` | 설치된 한컴오피스로 변환. 출력이 있으면 `-force` 없이는 안 덮어쓴다 | 한글이 깔린 Windows |
-| `svg2png [-width-mm N \| -width-px N] [-dpi 600] [-trim] [-o out.png] <in.svg>` | SVG 를 들어갈 너비에 맞춘 PNG 로. headless Chrome·Edge·Chromium·Firefox | 브라우저 있는 곳 |
+| `svg2png`, `svgfont`, `svgcheck` | 그림. `figures.md` 9절 | 브라우저·폰트 있는 곳 |
 | `version` | 버전 | 전부 |
 
-**`.hwp` 는 `text`·`info` 가 아직 못 읽는다.** `convert -to hwpx` 로 사본을 만들어 읽는다.
-한글이 없는 곳이면 hwpx 나 pdf 로 달라고 한다.
+| 보기 (`-view`) | 무엇 |
+|----------------|------|
+| `accepted` (기본) | 변경 추적을 모두 수락한 글. 한글이 TXT 로 저장하는 글과 같다 |
+| `original` | 모두 거절한 글. **지운 글이 파일 안에 아직 남아 있는지 볼 때 쓴다** |
+| `markup` | 넣은 글 `[+글+]`, 지운 글 `[-글-]` |
+
+`.hwp` 도 `text`·`info`·`verify` 로 바로 읽는다. 다만 변경 추적이 든 `.hwp` 는 보기를 나누지 못해 지운 글과 넣은 글이 섞여 나온다.
+**`.hwp` 는 바로 고치지 못한다.** `convert -to hwpx` 로 사본을 만들어 고친다. 한글이 없는 곳이면 hwpx 로 달라고 한다.
 
 ## 3. 작업 순서
 
 | # | 할 일 | 명령·방법 |
 |---|-------|-----------|
 | 1 | 원본을 복사한다. 원본은 고치지 않는다 | 사본 이름은 폴더 파일명 규칙의 다음 버전 |
-| 2 | `.hwp` 면 hwpx 사본을 만든다 | `"$WH" convert -to hwpx -o 사본.hwpx 원본.hwp` |
-| 3 | 구조와 글을 뽑는다 | `"$WH" info 사본.hwpx`, `"$WH" text 사본.hwpx > 원본.txt` |
-| 4 | 모양을 본다 | `"$WH" convert -to pdf -o 사본.pdf 사본.hwpx` 후 Read 로 쪽을 본다 |
-| 5 | 분석·질문 (`questions.md`) | 담당 표기, 메모, 변경 추적 개수를 적어 둔다 |
-| 6 | hwpx 를 고친다 | 5절 |
-| 7 | 그림을 넣는다 | `"$WH" svg2png -width-mm <영역 mm> ...` 후 5절의 그림 규칙 |
-| 8 | 검증한다 | 6절 |
-| 9 | 제출 형식이 `.hwp` 면 변환한다 | `"$WH" convert -to hwp -o 결과.hwp 결과.hwpx` |
+| 2 | 구조와 글을 뽑는다 | `"$WH" info 원본`, `"$WH" text 원본 > 원본.txt`. 메모 수, 변경 추적 수, 담당 표기를 적어 둔다 |
+| 3 | 모양을 본다 (Windows) | `"$WH" convert -to pdf -o 원본.pdf 원본` 후 Read 로 쪽을 본다 |
+| 4 | 분석·질문 (`questions.md`) | 변경 추적 저자 이름(`-author`)도 이때 묻는다. 한글 검토 화면에 그대로 보인다 |
+| 5 | `.hwp` 면 hwpx 사본을 만든다 | `"$WH" convert -to hwpx -o 사본.hwpx 원본.hwp`. 위치는 **이 사본의** `text` 로 다시 뽑는다 |
+| 6 | 그림을 만든다 | `figures.md` 9절: `svgfont` → `svgcheck` → `svg2png -width-mm <영역 mm>` |
+| 7 | 편집 명세를 쓰고 적용한다 | 4절 |
+| 8 | 검증한다 | 5절 |
+| 9 | 제출 형식이 `.hwp` 면 변환한다 | `"$WH" convert -to hwp -o 결과.hwp 결과.hwpx` 후 5절의 `verify` 를 `.hwp` 로 한 번 더 |
 
-## 4. HWPX 구조
+## 4. 고치는 법: `apply`
 
-| 무엇 | 사실 |
-|------|------|
-| 묶음 | zip. `mimetype` 이 **첫 항목이고 무압축(Stored)** |
-| 본문 | `Contents/section0.xml` (구역마다 `sectionN.xml`) |
-| 서식·저자·변경 추적 목록 | `Contents/header.xml` |
-| 목록(manifest) | `Contents/content.hpf` |
-| 그림 파일 | `BinData/` |
+hwpx 의 XML 을 손으로 고치지 않는다. `apply` 가 아래를 대신 한다 (why-hwp 저장소의 시험과 한글 실측으로 확인됨).
 
-## 5. hwpx 를 고치는 법 (why-hwp apply 가 들어오기 전)
+| `apply` 가 하는 일 | 손으로 할 때 틀렸던 것 |
+|--------------------|------------------------|
+| 고친 문단의 `linesegarray` 를 지운다 | 남기면 한글이 앞쪽 일부 쪽까지만 연다 (19쪽에서 멈춘 일) |
+| 새 문단은 `like`(없으면 `loc`) 문단의 문단·스타일·글자 모양을 쓴다 | 새 서식 ID 를 만들면 header 와 어긋난다 |
+| 넣은 글·지운 글을 변경 추적으로 감싸고 header 목록과 저자를 맞춘다 | 목록과 본문 표시가 어긋나면 변경 추적이 깨진다 |
+| 고치지 않은 문단은 바이트 그대로, 메모 보존 | 남의 메모와 남의 칸을 건드린 일 |
+| 그림은 PNG 를 손대지 않고 넣고 manifest 를 맞춘다 | `binaryItemIDRef` 가 어긋나면 그림이 안 나온다 |
+| `mimetype` 을 첫 항목, 무압축으로 묶는다 | Windows 에는 `zip` 이 없고 .NET 은 무압축을 지키지 못한다 |
 
-**`why-hwp apply` 가 들어오면 이 절을 그 명령으로 바꾼다.** 그 전에는 hwpx 의 XML 을 직접 고친다.
-아래 규칙은 실제 문서를 고치며 확인한 것이다.
+명세(JSON). 위치는 **입력 파일**을 `text` 로 뽑은 것이고, 연산끼리 번호를 바꾸지 않는다 (모두 입력 기준).
 
-| 규칙 | 왜 |
-|------|-----|
-| 고친 문단의 `<hp:linesegarray>` 는 지운다 | 남기면 한글이 앞쪽 일부 쪽까지만 연다 (19쪽에서 멈춘 일) |
-| 서식은 문서에 이미 있는 `paraPrIDRef`·`charPrIDRef` 를 쓴다. 같은 칸의 예시 문단에서 복사한다 | 새 서식 ID 를 만들면 header 와 어긋난다. 예시 스타일을 따르는 것이기도 하다 |
-| 넣은 글은 변경 추적으로 감싼다: `<hp:insertBegin Id=".." TcId=".."/>` … `<hp:insertEnd Id=".." TcId=".." paraend="0\|1"/>`. 지운 글은 `deleteBegin`/`deleteEnd` | 한글 검토 화면에서 무엇을 바꿨는지 보인다 |
-| header 의 `<hh:trackChanges itemCnt="N">` 아래에 `<hh:trackChange type="Insert\|Delete" date=".." authorID=".." hide="0" id=".."/>` 를 더하고 `itemCnt` 를 맞춘다. 저자는 `trackChangeAuthors` 에 | 목록과 본문 표시가 어긋나면 변경 추적이 깨진다 |
-| 메모(`<hp:fieldBegin type="MEMO">` …)는 건드리지 않는다 | 남의 메모다 |
-| 그림은 `hp:pic` 으로 넣는다. `treatAsChar=1`, 크기 `imgDim` 은 px × 75 (HWPUNIT). `binaryItemIDRef` 는 `content.hpf` 의 manifest 항목과 같아야 하고, 파일은 `BinData/` 에 | 어긋나면 그림이 안 나온다 |
-| 다시 묶을 때 `mimetype` 을 첫 항목, 무압축으로 | 한글이 hwpx 로 알아보는 조건이다 |
-
-**다시 묶는 법.** `zip` 명령이 있으면 이렇게 한다 (풀어 둔 폴더 안에서).
-
-```sh
-zip -X -0 ../결과.hwpx mimetype
-zip -X -r ../결과.hwpx . -x mimetype
-unzip -v ../결과.hwpx | head -5     # 첫 항목이 mimetype 이고 Method 가 Stored 인지 본다
+```json
+{"ops": [
+  {"op": "set_text", "loc": "s0/p4/t0/r1/c2", "text": "새 글"},
+  {"op": "replace", "loc": "s0/p7", "find": "옛 표현", "with": "새 표현"},
+  {"op": "insert_after", "loc": "s0/p1", "paras": [{"text": "1.1 목적", "like": "s0/p1"}]},
+  {"op": "delete", "loc": "s0/p5"},
+  {"op": "image", "after": "s0/p9", "src": "그림1.png", "width_mm": 150}
+]}
 ```
 
-이 명령 순서는 이 문서를 쓸 때 돌려 보지 않았다. **`unzip -v` 확인과 6절 검증을 꼭 거친다.**
+`src` 는 명세 파일 기준 경로다. 명세 파일은 산출물 폴더에 둔다 (스크래치패드에 두지 않는다).
 
-**Windows Git Bash 에는 `zip` 이 없다** (2026-11-11 이 PC 에서 `command -v zip` 빈 결과).
-PowerShell 의 .NET `ZipFile` 에 `NoCompression` 을 줘도 `mimetype` 이 Deflate 로 들어가 조건을 못 맞춘다
-(2026-11-11 실측, `unzip -v` 에 `Defl:N`). `zip` 이 없으면 묶지 못한다고 알리고 멈춘다.
+```sh
+"$WH" apply -spec 편집.json -o 결과.hwpx -author "<물어서 정한 이름>" 사본.hwpx
+```
 
-## 6. 검증
+`apply` 로 안 되는 편집(표 행 추가, 머리말 수정 등)이면 XML 을 손으로 고치지 않는다. 안 된다고 알리고 사용자에게 한글에서 할 일을 위치와 함께 적어 준다.
+
+## 5. 검증
 
 | 검사 | 어떻게 |
 |------|--------|
-| 열리나 | `"$WH" convert -to pdf` 가 끝까지 되고, PDF 마지막 쪽에 원본 마지막 쪽 글이 있는지. 앞쪽 일부만 나오면 5절 `linesegarray` 를 본다 |
-| 남의 글이 그대로인가 | 원본과 결과에서 `text` 를 뽑아 diff. 우리 칸 밖의 줄이 바뀌었으면 안 된다 |
-| 메모·변경 추적 | `info` 의 메모 수가 원본과 같고, 변경 추적이 이번에 고친 만큼 늘었는지 |
-| 그림 | PDF 쪽에서 그림이 영역 안에 들어갔는지 눈으로 |
-| 모양 | PDF 를 원본 PDF 와 나란히 보고 표가 깨지거나 쪽이 밀리지 않았는지 |
+| 남의 글이 그대로인가 | `"$WH" verify -orig 원본 -allow 우리칸.txt 결과.hwpx`. `우리칸.txt` 는 이번에 고쳐도 되는 위치 목록 (`s0/p4/t0/*` 는 접두사). 목록 밖이 바뀌면 위반 |
+| 메모 | `info` 의 메모 수가 원본과 같다. `verify -orig` 는 메모가 사라지면 위반을 낸다 |
+| 변경 추적 | **두 조건을 따로 본다.** (1) 원본에 있던 변경 추적이 하나도 사라지지 않았다: `verify -orig` 가 위반을 안 낸다. (2) 이번 편집이 새 변경 추적으로 남았다: `info` 의 변경 추적 수가 원본보다 늘었고, `text -view markup` 에서 고친 위치에 `[+ +]`·`[- -]` 가 보인다. 수가 원본과 같으면 편집이 추적되지 않은 것이다 |
+| 금지어·em dash | `-banned 금지어.txt` (내부 이름 목록을 넣는다). em dash 는 항상 위반 |
+| 열리나 (Windows) | `"$WH" convert -to pdf` 가 끝까지 되고, PDF 마지막 쪽에 원본 마지막 쪽 글이 있는지 |
+| 그림·모양 (Windows) | PDF 를 원본 PDF 와 나란히 보고 그림이 영역 안에 있는지, 표가 깨지거나 쪽이 밀리지 않았는지 |
 
-## 7. 한글 COM 과 저장의 함정
+### 공개·외부 제출본
+
+`text` 로 grep 해서 0건이어도 파일 안에 남는 것이 있다. 공개하거나 외부에 내는 파일이면 아래를 따로 본다.
+
+| 숨는 곳 | 보는 법 |
+|---------|---------|
+| 메모 본문 | `info` 가 메모 글을 보여 준다. 내부 이름이 있으면 사용자에게 알린다. 남의 메모를 지우는 것은 사용자가 정한다 |
+| 지운 글 (변경 추적) | `text -view original` 로 grep. 수락하기 전까지 지운 글은 파일에 남는다 |
+| 머리말·꼬리말·각주 | why-hwp 가 뽑지 않는다. PDF 로 바꿔 눈으로 본다. 못 보면 "확인 못 함" 으로 보고 |
+| 그림 속 글자 | grep 에 안 잡힌다. 그림 파일을 하나씩 연다 (`writing.md` 4절) |
+
+변경 추적과 메모를 그대로 둔 채로는 공개본이 되지 않는다. **작업본과 공개본을 나눈다.** 공개본은 사용자가 한글에서 변경 내용을 모두 적용하고 메모를 정리한 뒤(또는 PDF 로) 만들고, 그 파일로 위 검사를 다시 한다.
+
+## 6. 한글 COM 과 저장의 함정
 
 | 함정 | 어떻게 |
 |------|--------|
@@ -102,7 +118,7 @@ PowerShell 의 .NET `ZipFile` 에 `NoCompression` 을 줘도 `mimetype` 이 Defl
 | OneDrive 같은 동기화 폴더에 바로 저장하면 멈출 수 있다 | 임시 폴더에 저장한 뒤 복사하고, 두 파일의 md5 가 같은지 본다 (`md5sum 임시본 복사본`) |
 | `.hwp` 를 Go 로 직접 쓰는 기능은 없다 | 저장은 hwpx 로 하고, `.hwp` 가 필요하면 `convert -to hwp` |
 
-## 8. docx 에서 글을 뽑을 때
+## 7. docx 에서 글을 뽑을 때
 
 `why-hwp text` 는 아래 두 함정을 처리한다. 다른 방법으로 뽑으면 직접 걸러야 한다.
 
