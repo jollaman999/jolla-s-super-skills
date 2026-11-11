@@ -44,6 +44,12 @@ done
 command -v claude >/dev/null || { echo "claude 가 PATH 에 없습니다" >&2; exit 2; }
 command -v jq     >/dev/null || { echo "jq 가 없습니다" >&2; exit 2; }
 
+# Windows 판 jq 는 줄 끝을 CRLF 로 낸다. 그대로 두면 판별기의 문자열 비교가 전부 어긋난다.
+# -b 는 Windows 판에만 있는 옵션이라 그때만 붙인다.
+jq() {
+  case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) command jq -b "$@" ;; *) command jq "$@" ;; esac
+}
+
 # --outdir 를 주면 결과를 거기에 남기고 지우지 않는다. 밖에서 임시 폴더를 찾아
 # 폴링할 필요가 없어진다. 실행을 둘 띄웠을 때 남의 폴더를 집는 일도 없어진다.
 if [ -n "$OUTDIR" ]; then

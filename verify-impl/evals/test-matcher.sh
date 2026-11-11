@@ -11,6 +11,7 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+eval "$(sed -n '/^jq()/,/^}/p'               "$HERE/run.sh")"
 eval "$(sed -n '/^cmd_regex()/,/^}/p'        "$HERE/run.sh")"
 eval "$(sed -n '/^outside_sandbox()/,/^}/p'  "$HERE/run.sh")"
 eval "$(sed -n '/^edited_paths()/,/^}/p'     "$HERE/run.sh")"
