@@ -2,11 +2,11 @@
 # doc-write 가 쓰는 why-hwp 실행 파일을 GitHub 릴리즈에서 받아 doc-write/bin/ 에 둔다.
 # hwp/hwpx 읽기·변환과 SVG -> PNG 에 쓴다. 실행 파일은 repo 에 넣지 않고 설치 때 받는다.
 #
-# usage: fetch-why-hwp.sh [--check | --which] [--force] [--dest DIR]
+# usage: fetch-why-hwp.sh [--check | --which | --force] [--dest DIR]
 #   (옵션 없음) : 쓸 수 있는 why-hwp 가 없으면 받는다
 #   --check     : 무엇을 쓸지와 그 버전만 보고 끝낸다. 받지 않는다
 #   --which     : 쓸 실행 파일 경로 한 줄만 낸다. 없으면 아무것도 안 내고 1. 받지 않는다
-#   --force     : bin/ 에 이미 있어도 다시 받는다 (WHY_HWP_BIN·PATH 의 것은 그대로 쓴다)
+#   --force     : bin/ 에 이미 있어도 다시 받는다 (WHY_HWP_BIN·PATH 의 것은 그대로 쓴다). --check·--which 와 같이 못 쓴다
 #   --dest DIR  : 받을 곳. 기본은 이 스크립트 옆의 ../bin
 #
 # 찾는 순서 (앞에서 찾으면 받지 않는다)
@@ -15,7 +15,7 @@
 #   3) <dest>/why-hwp[.exe]   이 스크립트가 받아 둔 것
 #
 # 환경 변수
-#   WHY_HWP_BIN      위 1)
+#   WHY_HWP_BIN      위 1). 상대 경로는 현재 폴더 기준으로 본다. PATH 에서 찾지 않는다
 #   WHY_HWP_VERSION  받을 버전 (예 v0.2.0). 없으면 최신 릴리즈
 #   WHY_HWP_BASE_URL 릴리즈 파일을 받을 곳. 기본 https://github.com/jollaman999/why-hwp/releases/download
 #                    사내 미러나 file:// 로 바꿀 때 쓴다. 최신 버전은 못 찾으니 WHY_HWP_VERSION 을 같이 준다
@@ -43,6 +43,11 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+if [ "$FORCE" -eq 1 ] && [ "$MODE" != fetch ]; then
+  echo "--force 는 받을 때만 씁니다. --check·--which 와 같이 쓸 수 없습니다." >&2
+  sed -n '5,10p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2
+  exit 2
+fi
 
 say(){ [ "$MODE" = which ] || printf '%s\n' "$*"; }
 
@@ -68,8 +73,18 @@ LOCAL="$DEST/why-hwp$EXT"
 
 # --- 버전 ---
 # why-hwp version 은 "why-hwp v0.1.0" 처럼 낸다. 개발 빌드는 커밋 해시가 온다.
+# 종료 상태는 실행 파일의 것이다 (pipefail). 0 이 아니면 출력이 있어도 실패다.
 bin_version() { # <실행 파일>
-  "$1" version 2>/dev/null | awk 'NR==1{print $NF}'
+  command "$1" version 2>/dev/null | awk 'NR==1{print $NF}'
+}
+
+# 현재 폴더 기준 절대 경로. Windows 의 C:\... · C:/... 는 이미 절대 경로라 그대로 둔다.
+abs_path() { # <경로>
+  case "$1" in
+    /*) printf '%s\n' "$1" ;;
+    [A-Za-z]:[\\/]*) if [ "$OS" = windows ]; then printf '%s\n' "$1"; else printf '%s/%s\n' "$PWD" "$1"; fi ;;
+    *)  printf '%s/%s\n' "$PWD" "$1" ;;
+  esac
 }
 
 # 0=최소 이상  1=낮음  2=버전을 읽을 수 없음 (개발 빌드 등)
@@ -91,9 +106,9 @@ version_ok() { # <버전>
 # 쓸 수 있으면 0. 버전이 낮으면 1. 실행이 안 되면 3.
 judge() { # <실행 파일> <어디서 찾았나>
   local f="$1" from="$2" ver rc
-  ver=$(bin_version "$f")
-  if [ -z "$ver" ]; then
-    say "  [없음] $from: $f 가 실행되지 않습니다"
+  ver=$(bin_version "$f"); rc=$?
+  if [ "$rc" -ne 0 ] || [ -z "$ver" ]; then
+    say "  [없음] $from: $f 가 실행되지 않습니다 (종료 코드 $rc)"
     return 3
   fi
   version_ok "$ver"; rc=$?
@@ -110,6 +125,7 @@ judge() { # <실행 파일> <어디서 찾았나>
 # --- 1) WHY_HWP_BIN, 2) PATH ---
 # 사용자가 직접 둔 것은 받아서 덮지 않는다. 버전이 낮으면 알리고 멈춘다.
 if [ -n "${WHY_HWP_BIN:-}" ]; then
+  WHY_HWP_BIN=$(abs_path "$WHY_HWP_BIN")
   if [ ! -f "$WHY_HWP_BIN" ]; then
     say "  [없음] WHY_HWP_BIN: $WHY_HWP_BIN 이 없습니다"
     exit 1
@@ -119,8 +135,8 @@ if [ -n "${WHY_HWP_BIN:-}" ]; then
   say "  WHY_HWP_BIN 이 가리키는 파일을 새 버전으로 바꾸거나, 변수를 지우고 다시 실행하세요."
   exit 1
 fi
-if command -v why-hwp >/dev/null 2>&1; then
-  judge "$(command -v why-hwp)" PATH; rc=$?
+if PATH_BIN=$(type -P why-hwp); then
+  judge "$PATH_BIN" PATH; rc=$?
   [ "$rc" -eq 0 ] && exit 0
   say "  PATH 의 why-hwp 를 새 버전으로 바꾸거나 PATH 에서 빼고 다시 실행하세요."
   exit 1
@@ -182,12 +198,18 @@ sha256_of() { # <파일>
   else return 1; fi
 }
 
-TMP_API=$(mktemp) || { say "임시 파일을 만들 수 없습니다"; exit 1; }
-TMP_SUM=$(mktemp) || { rm -f "$TMP_API"; say "임시 파일을 만들 수 없습니다"; exit 1; }
-# 실행 파일은 옮길 때 같은 디스크여야 해서 받을 곳 안에 둔다. 경로는 받기 직전에 정한다.
-TMP_BIN=""
-cleanup() { rm -f "$TMP_API" "$TMP_SUM"; [ -z "$TMP_BIN" ] || rm -f "$TMP_BIN"; }
+# 받기·검증은 받을 곳 안의 비공개 임시 폴더(700)에서 한다. 이름을 예측할 수 없어 미리 심어 둔 링크를 따라 쓰지 않고,
+# 실행 파일을 옮길 때 같은 디스크가 된다. 끝나면 (실패·중단 포함) 지운다.
+mkdir -p "$DEST" || { say "받을 곳을 만들 수 없습니다: $DEST"; exit 1; }
+WORK=$(mktemp -d "$DEST/.why-hwp.XXXXXXXX") || { say "임시 폴더를 만들 수 없습니다: $DEST"; exit 1; }
+TMP_API="$WORK/api.json"
+TMP_SUM="$WORK/SHA256SUMS"
+TMP_BIN="$WORK/why-hwp$EXT"
+cleanup() { rm -f "$TMP_API" "$TMP_SUM" "$TMP_BIN"; rmdir "$WORK" 2>/dev/null; }
 trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+chmod 700 "$WORK" || { say "임시 폴더 권한을 바꿀 수 없습니다: $WORK"; exit 1; }
 
 RELEASES="https://github.com/$REPO_SLUG/releases"
 BASE_URL="${WHY_HWP_BASE_URL:-$RELEASES/download}"
@@ -240,8 +262,6 @@ if [ -z "$WANT" ]; then
   exit 1
 fi
 
-mkdir -p "$DEST" || { say "받을 곳을 만들 수 없습니다: $DEST"; exit 1; }
-TMP_BIN="$DEST/.why-hwp.download.$$"
 get "$BASE/$ASSET" "$TMP_BIN"; rc=$?
 if [ "$rc" -ne 0 ]; then
   say "실행 파일을 받지 못했습니다: $BASE/$ASSET"
@@ -260,9 +280,20 @@ if [ "$GOT" != "$WANT" ]; then
   exit 1
 fi
 
-chmod +x "$TMP_BIN"
-mv -f "$TMP_BIN" "$LOCAL" || { say "옮기지 못했습니다: $LOCAL (실행 중이면 닫고 다시 하세요)"; exit 1; }
 say "  SHA256 일치 ($GOT)"
+
+# 기존 설치본은 받은 파일이 실행되고 버전이 받으려던 태그와 같을 때만 바꾼다.
+chmod +x "$TMP_BIN" || { say "실행 권한을 줄 수 없습니다. 기존 설치본은 그대로 둡니다."; exit 1; }
+NEWVER=$(bin_version "$TMP_BIN"); rc=$?
+if [ "$rc" -ne 0 ] || [ -z "$NEWVER" ]; then
+  say "받은 실행 파일이 실행되지 않습니다 (종료 코드 $rc). 기존 설치본은 그대로 둡니다."
+  exit 1
+fi
+if [ "${NEWVER#v}" != "${TAG#v}" ]; then
+  say "받은 실행 파일의 버전 $NEWVER 이 받으려던 $TAG 와 다릅니다. 기존 설치본은 그대로 둡니다."
+  exit 1
+fi
+mv -f "$TMP_BIN" "$LOCAL" || { say "옮기지 못했습니다: $LOCAL (실행 중이면 닫고 다시 하세요)"; exit 1; }
 judge "$LOCAL" "받은 것"; rc=$?
 [ "$rc" -eq 0 ] && exit 0
 exit 1
