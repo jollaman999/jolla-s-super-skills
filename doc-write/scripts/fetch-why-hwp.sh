@@ -174,9 +174,14 @@ fi
 
 # 0=받음  4=404 (없음)  5=403 (호출 제한 등)  1=그 밖의 실패
 get() { # <URL> <저장할 파일>
-  local code out rc
+  local code out rc err
+  GET_WHY=""
   if [ "$DL" = curl ]; then
-    code=$(curl -sSL --connect-timeout 15 --max-time 600 -o "$2" -w '%{http_code}' "$1" 2>/dev/null); rc=$?
+    err=$(mktemp "${TMPDIR:-/tmp}/why-hwp-curl.XXXXXX" 2>/dev/null) || err=/dev/null
+    code=$(curl -sSL --connect-timeout 15 --max-time 600 -o "$2" -w '%{http_code}' "$1" 2>"$err"); rc=$?
+    # 실패했을 때 원인을 보여 주려고 curl 의 종료 코드·HTTP 코드·에러 한 줄을 남긴다
+    GET_WHY="curl 종료 코드 $rc, HTTP $code"
+    [ "$err" != /dev/null ] && { [ -s "$err" ] && GET_WHY="$GET_WHY, $(head -1 "$err")"; rm -f "$err"; }
     [ "$code" = 404 ] && return 4
     [ "$code" = 403 ] && return 5
     [ "$rc" -eq 0 ] && [ "$code" = 200 ] && return 0
@@ -186,6 +191,7 @@ get() { # <URL> <저장할 파일>
     return 1
   fi
   out=$(wget -S -q --timeout=30 --tries=2 -O "$2" "$1" 2>&1); rc=$?
+  GET_WHY="wget 종료 코드 $rc"
   [ "$rc" -eq 0 ] && return 0
   printf '%s' "$out" | grep -q 'HTTP/[0-9.]* 404' && return 4
   printf '%s' "$out" | grep -q 'HTTP/[0-9.]* 403' && return 5
@@ -252,6 +258,7 @@ get "$BASE/SHA256SUMS" "$TMP_SUM"; rc=$?
 if [ "$rc" -ne 0 ]; then
   if [ "$rc" -eq 4 ]; then say "릴리즈 $TAG 가 없거나 SHA256SUMS 가 없습니다: $BASE/SHA256SUMS"
   else say "SHA256SUMS 를 받지 못했습니다: $BASE/SHA256SUMS"; fi
+  [ -n "$GET_WHY" ] && say "  ($GET_WHY)"
   hint_manual
   exit 1
 fi
@@ -265,6 +272,7 @@ fi
 get "$BASE/$ASSET" "$TMP_BIN"; rc=$?
 if [ "$rc" -ne 0 ]; then
   say "실행 파일을 받지 못했습니다: $BASE/$ASSET"
+  [ -n "$GET_WHY" ] && say "  ($GET_WHY)"
   exit 1
 fi
 
