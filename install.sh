@@ -196,6 +196,7 @@ fi
 LINKS=(
   "CLAUDE.md:CLAUDE.md"
   "design-first:skills/design-first"
+  "doc-write:skills/doc-write"
   "plan-run:skills/plan-run"
   "verify-impl:skills/verify-impl"
   "deploy-verify:skills/deploy-verify"
@@ -449,6 +450,9 @@ if [ "$UNINSTALL" -eq 1 ]; then
   say
   say "각 repo 의 .git/hooks 에 설치한 훅은 그대로 남습니다."
   say "  지우려면: ~/.claude/skills/hooks/install-hooks.sh <repo> --uninstall"
+  if [ -d "$REPO/doc-write/bin" ]; then
+    say "doc-write 가 받아 둔 why-hwp 는 이 repo 안에 그대로 남습니다: $REPO/doc-write/bin"
+  fi
   exit 0
 fi
 
@@ -482,6 +486,12 @@ if [ "$CHECK" -eq 1 ]; then
   say
   # 설치된 링크가 아직 살아 있는지도 본다. 깨지면 skill 이 조용히 사라지기 때문이다.
   "$REPO/shared/scripts/check-install.sh" "$DEST"; INST=$?
+  say
+  # doc-write 가 hwp/hwpx 를 읽고 그림을 PNG 로 만들 때 쓰는 실행 파일. 없어도 나머지 skill 은 동작한다.
+  say "[문서 도구] doc-write 가 쓰는 why-hwp"
+  FW="$DEST/skills/doc-write/scripts/fetch-why-hwp.sh"
+  [ -f "$FW" ] || FW="$REPO/doc-write/scripts/fetch-why-hwp.sh"
+  bash "$FW" --check || pf_warn "why-hwp 없음 - doc-write 의 hwp 읽기·변환과 SVG -> PNG 를 못 합니다"
   say
   if [ "$PF_FAIL" -gt 0 ]; then
     say "필수 항목 ${PF_FAIL}개가 빠졌습니다. 주의 ${PF_WARN}개."
@@ -602,6 +612,8 @@ fi
 
 if [ "$DRY" -eq 1 ]; then
   say
+  say "  (dry-run) doc-write 가 쓰는 why-hwp 를 릴리즈에서 받았을 것입니다 (doc-write/scripts/fetch-why-hwp.sh)"
+  say
   say "dry-run 이라 아무것도 바꾸지 않았습니다."
   exit 0
 fi
@@ -689,6 +701,20 @@ else
   fi
 fi
 
+# --- 문서 도구 (why-hwp) ---
+# doc-write 가 hwp/hwpx 를 읽고 그림을 PNG 로 만들 때 쓴다. 실행 파일은 repo 에 넣지 않고 여기서 받는다.
+# 못 받아도 설치는 끝낸다. 나머지 skill 과 doc-write 의 다른 문서 작업은 이것 없이 된다.
+say
+say "[문서 도구] doc-write 가 쓰는 why-hwp"
+FW="$DEST/skills/doc-write/scripts/fetch-why-hwp.sh"
+if [ ! -f "$FW" ]; then
+  say "  건너뜀 (doc-write 가 설치되지 않았습니다)"
+elif ! bash "$FW"; then
+  say "  why-hwp 를 받지 못했습니다. 설치는 그대로 끝냅니다."
+  say "  hwp/hwpx 읽기·변환과 SVG -> PNG 만 못 하고, 다른 문서 작업은 됩니다."
+  say "  나중에 받기: bash $FW"
+fi
+
 # --- 확인 ---
 say
 say "[확인]"
@@ -730,6 +756,8 @@ say "  커밋 훅     고칠 repo 마다 한 번. 시크릿·표기 규칙을 �
 say "              $DEST/skills/hooks/install-hooks.sh <repo>"
 say "  repo 프로필 그 repo 의 커밋 스타일을 읽어 기록한다"
 say "              $DEST/skills/shared/scripts/repo-profile.sh <repo>"
+say "  why-hwp     doc-write 의 hwp 도구. 못 받았을 때 다시, 새 릴리즈로 바꿀 때는 --force"
+say "              bash $DEST/skills/doc-write/scripts/fetch-why-hwp.sh"
 say "  설치 점검   링크가 깨졌는지 본다. 이상해 보일 때"
 say "              $0 $([ "$SCOPE" = project ] && echo "--project $PROJDIR ")--check"
 say "  해제        $0 $([ "$SCOPE" = project ] && echo "--project $PROJDIR ")--uninstall"

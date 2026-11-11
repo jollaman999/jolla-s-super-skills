@@ -16,6 +16,9 @@
 /tmp/
 .DS_Store
 
+# 설치 때 릴리즈에서 받는 실행 파일 (doc-write/scripts/fetch-why-hwp.sh)
+/doc-write/bin/
+
 # 프로필 갱신 시 남는 이전 내용
 .claude/repo-profile.md.bak
 
