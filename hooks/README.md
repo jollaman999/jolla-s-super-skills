@@ -147,6 +147,9 @@ repo 에서만 뜨고, 돌릴 케이스 목록은 `verify-impl/evals/quick.txt` 
        돌릴지는 직접 정하세요. 커밋은 그대로 됩니다.
 ```
 
+eval 판정기(`verify-impl/evals/run.sh`, `cases/*.rule`)가 스테이지되면 `verify-impl/evals/test-judge.sh`
+를 돌려 보라고 알립니다. 보관한 실제 기록을 다시 판정하는 것이라 세션을 안 띄우고 몇 초에 끝납니다.
+
 절대경로는 `$HOME` 과 `git rev-parse --show-toplevel` 을 실행할 때 읽어서 씁니다. 사람마다 다른 값이라
 훅 안에 적어두면 그 값이 공개 repo 에 그대로 나갑니다. 조직명 목록을 커밋 안 되는 곳에서 읽는 것과 같은 이유입니다.
 문서에서 쓰는 `~/.claude/...` 같은 물결표 표기와 `$(dirname "$0")` 은 걸리지 않습니다.

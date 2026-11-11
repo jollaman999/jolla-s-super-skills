@@ -13,6 +13,8 @@
 #   --timeout  : 세션 하나의 제한 시간, 초 (기본 420)
 #   --jobs     : 케이스를 몇 개까지 동시에 돌릴지 (기본 1). 많이 띄우면 느려져 제한 시간에 걸린다
 #   --outdir   : 결과를 이 폴더에 남긴다 (<케이스>.out, summary.txt, exit). 안 주면 임시 폴더에 넣고 끝나며 지운다
+#   --rescore  : 세션을 안 띄우고 보관한 기록을 지금 판정기로 다시 판정한다. 뒤에 기록 폴더를 준다
+#                (<케이스>/<pass|fail>/<id>, save-fixture.sh 가 만든 것). 판정기 회귀는 test-judge.sh
 #
 # exit: 0=전부 통과  1=규칙 실패 있음  2=사용법 오류 또는 세션을 못 돌림
 set -uo pipefail
@@ -21,7 +23,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO="$(cd "$HERE/../.." && pwd -P)"
 CASEDIR="$HERE/cases"
 
-KEEP=0; MODEL=""; TURNS=30; LIMIT=420; REPS=1; REPS_SET=0; JOBS=1; OUTDIR=""; WANT=()
+KEEP=0; MODEL=""; TURNS=30; LIMIT=420; REPS=1; REPS_SET=0; JOBS=1; OUTDIR=""; WANT=(); RESCORE=0
 
 usage() { sed -n '3,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
@@ -34,6 +36,7 @@ while [ $# -gt 0 ]; do
     --timeout) shift; LIMIT="${1:-420}" ;;
     --jobs)    shift; JOBS="${1:-1}" ;;
     --outdir)  shift; OUTDIR="${1:-}" ;;
+    --rescore) RESCORE=1 ;;
     -h|--help) usage; exit 0 ;;
     -*)        usage >&2; exit 2 ;;
     *)         WANT+=("$1") ;;
@@ -41,7 +44,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-command -v claude >/dev/null || { echo "claude 가 PATH 에 없습니다" >&2; exit 2; }
+[ "$RESCORE" -eq 1 ] || command -v claude >/dev/null || { echo "claude 가 PATH 에 없습니다" >&2; exit 2; }
 command -v jq     >/dev/null || { echo "jq 가 없습니다" >&2; exit 2; }
 
 # Windows 판 jq 는 줄 끝을 CRLF 로 낸다. 그대로 두면 판별기의 문자열 비교가 전부 어긋난다.
@@ -68,7 +71,10 @@ finish() { [ -n "$OUTDIR" ] && printf '%s\n' "$1" > "$OUTDIR/exit"; exit "$1"; }
 CREDS="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json"
 
 # 실행할 케이스 목록
-if [ "${#WANT[@]}" -eq 0 ]; then
+if [ "$RESCORE" -eq 1 ]; then
+  [ "${#WANT[@]}" -gt 0 ] || { echo "--rescore 뒤에 기록 폴더를 주세요" >&2; exit 2; }
+  REPS_SET=1
+elif [ "${#WANT[@]}" -eq 0 ]; then
   for f in "$CASEDIR"/*.txt; do
     [ -e "$f" ] || continue
     WANT+=("$(basename "$f" .txt)")
@@ -743,6 +749,28 @@ run_case() { # <케이스이름>
   printf '%s' "$keeps"   | grep -v '^$' | sed 's/^/       기록: /'
   printf 'STATUS:%s\n' "$st"
 }
+
+# 보관한 기록을 다시 판정한다. 기록 폴더마다 한 줄: <pass|fail|err> <폴더> 와 사유.
+# 케이스 이름은 폴더 경로의 <케이스>/<pass|fail>/<id> 에서 읽는다. 규칙은 지금 cases/ 의 것이다.
+# repo 워킹트리 비교는 세션 전 상태가 없어 하지 않는다.
+if [ "$RESCORE" -eq 1 ]; then
+  rc=0
+  for fx in "${WANT[@]}"; do
+    fx="${fx%/}"
+    name=$(basename "$(dirname "$(dirname "$fx")")")
+    rule="$CASEDIR/$name.rule"
+    if [ ! -f "$fx/out.json" ] || [ ! -f "$fx/sandbox.path" ] || [ ! -f "$rule" ]; then
+      printf 'err  %s  기록(out.json, sandbox.path)이나 규칙(%s)이 없음\n' "$fx" "$rule"; rc=2; continue
+    fi
+    res=$(judge "$rule" "$(cat "$fx/sandbox.path")" "$fx/proj" "$fx/cfg" "$fx/out.json")
+    if printf '%s\n' "$res" | grep -q '^E:'; then st=err; [ "$rc" -eq 0 ] && rc=2
+    elif printf '%s\n' "$res" | grep -q '^R:'; then st=fail; rc=1
+    else st=pass; fi
+    printf '%-4s %s\n' "$st" "$fx"
+    printf '%s\n' "$res" | grep -E '^[ERW]:' | sed 's/^/       /'
+  done
+  exit "$rc"
+fi
 
 PASS=0; FAIL=0; ERR=0; FAILED=(); ERRED=()
 if [ -n "$OUTDIR" ]; then

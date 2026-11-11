@@ -29,6 +29,9 @@ verify-impl/evals/run.sh --jobs 3        # 케이스 3개를 동시에. 전체 �
 verify-impl/evals/run.sh --model claude-opus-5   # 모델 고정. 비교할 때는 고정해야 한다
 verify-impl/evals/run.sh --outdir /tmp/r # 결과를 /tmp/r 에 남긴다. 백그라운드로 돌릴 때
 verify-impl/evals/test-matcher.sh        # 명령 판별기만 시험. 세션을 안 띄워서 즉시 끝난다
+verify-impl/evals/test-judge.sh          # 보관한 실제 기록으로 판정기 회귀. 몇 초
+verify-impl/evals/run.sh --rescore <기록 폴더>   # 보관한 기록 하나를 지금 판정기로 다시 판정
+verify-impl/evals/save-fixture.sh <out.json> <케이스> pass|fail   # 회차 기록을 보관
 ```
 
 **`--reps` 를 안 주면 몇 번 돌릴지 물어봅니다.** 세션 하나에 1~3분 걸리고 토큰을 쓰기 때문에
@@ -233,6 +236,20 @@ for line in open(sys.argv[1],errors='replace'):
 | 실패 사유가 `필수문구가 없음` 인가 | **판정기부터 의심합니다.** 답변이 그 뜻을 다른 말로 냈는지 봅니다 |
 | 답변이 요구된 동작을 했는데 낱말만 다른가 | 케이스의 `필수문구` 를 관측된 표현까지 넓힙니다. 재실행 필요 없습니다 |
 | 답변이 실제로 그 동작을 안 했는가 | 그때 비로소 규칙 문제입니다. `--reps` 로 흔들림 폭을 잽니다 |
+
+**판정기가 틀린 쪽으로 판명되면 그 기록을 보관합니다.** 판정기를 고친 뒤 `test-judge.sh` 가
+그 기록을 다시 판정해, 같은 결함이 돌아오면 세션 없이 잡습니다.
+
+```sh
+verify-impl/evals/save-fixture.sh /tmp/tmp.XXXX/out.json D12 pass   # 판정기가 실패로 찍었지만 맞게 한 회차
+verify-impl/evals/save-fixture.sh /tmp/tmp.YYYY/out.json D12 fail   # 진짜로 규칙을 어긴 회차
+verify-impl/evals/test-judge.sh                                     # 보관한 것 전부를 다시 판정
+```
+
+`pass`·`fail` 은 run.sh 가 낸 판정이 아니라 **기록을 읽고 사람이 정한 올바른 판정**입니다.
+기록은 `<repo>/.claude/eval-fixtures/` 에 둡니다. git 밖이라 지우면 되살릴 수 없습니다.
+로그인 정보·설치된 skill·세션 jsonl 은 빼고 보관합니다. 손으로 만든 기록은 넣지 않습니다 -
+`jq @tsv` 를 거친 실제 기록은 탭이 리터럴 `\t` 로 오는 식으로 손으로 쓴 것과 모양이 다릅니다.
 
 **판정기가 틀린 쪽이 더 흔합니다.** 한 세션에서 실패 2건이 나왔는데 둘 다 그랬습니다.
 한 건은 기록을 먼저 읽어 **세션 0개**로 원인을 찾았고, 다른 한 건은 3회·10회를 먼저 돌려

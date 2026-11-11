@@ -384,6 +384,16 @@ if printf '%s\n' "${STAGED[@]}" | grep -qE '(^|/)(CLAUDE\.md|SKILL\.md)$'; then
   fi
 fi
 
+# 판정기(run.sh, 케이스 규칙)를 고쳤으면 보관한 실제 기록으로 회귀를 볼 것을 알린다.
+# 세션을 안 띄우고 몇 초에 끝난다. 막지는 않는다.
+if printf '%s\n' "${STAGED[@]}" | grep -qE '^verify-impl/evals/(run\.sh|cases/.*\.rule)$'; then
+  if [ -x "$TOPDIR/verify-impl/evals/test-judge.sh" ]; then
+    echo
+    echo "[알림] eval 판정기를 고쳤습니다. 보관한 기록으로 판정이 그대로인지 보세요:"
+    echo "       verify-impl/evals/test-judge.sh"
+  fi
+fi
+
 if [ "$VISCHECK_PUBLIC" -eq 1 ]; then
   FAIL=1
   echo
