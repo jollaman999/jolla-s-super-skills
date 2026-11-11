@@ -54,6 +54,7 @@ $ verify-impl/evals/run.sh E1 E2
 | 로그인 만료·API 오류 | `is_error` 가 true | 로그인 다시 |
 | 시간 초과로 잘림 | `result` 줄 자체가 없음 | `--timeout` 을 올린다 |
 | 턴 상한 | `subtype` 이 `error_max_turns` | `--turns` 를 올린다 |
+| 설치 누락 | 케이스의 `skill =`·`필수에이전트 =` 가 세션 시작 기록(`system/init`)의 `skills`·`agents` 에 없음 | 남은 `install.log` 를 본다 |
 
 `Not logged in` 은 정상 종료인 척 옵니다 (`subtype` 이 `success`). 이걸 안 가르면
 빈 답변을 "규칙을 안 지켰다" 로 읽게 됩니다. 세션을 여럿 동시에 돌리면 느려져서

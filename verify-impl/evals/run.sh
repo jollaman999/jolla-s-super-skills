@@ -202,6 +202,13 @@ session_error() {
             else empty end' "$1" 2>/dev/null
 }
 
+# 세션에 실린 skill·에이전트 목록. 시작 레코드(system/init)의 skills·agents 에 있다.
+# 설치가 덜 됐는데 "skill 을 안 불렀음" 으로 찍으면 환경 문제가 규칙 실패로 둔갑한다.
+# 기록에 init 이 없으면(형식이 바뀐 버전) 아무것도 안 내고, 호출부는 검사를 건너뛴다.
+loaded() { # <기록> skills|agents
+  jq -r --arg k "$2" 'select(.type=="system" and .subtype=="init") | .[$k][]? // empty' "$1" 2>/dev/null | sort -u
+}
+
 # 어떤 팀원(서브에이전트)을 띄웠는가. 기록에 subagent_type 으로 남는다.
 agents_used() {
   grep -o '"subagent_type":"[^"]*"' "$1" 2>/dev/null | sed 's/.*:"//; s/"$//' | sort -u
@@ -451,6 +458,24 @@ run_once() { # <케이스이름> <규칙파일> <프롬프트파일>
   err=$(session_error "$out" | head -1)
   if [ -n "$err" ]; then
     printf 'E:%s\n' "$(printf '%s' "$err" | cut -c1-120)"
+    printf 'K:%s\n' "$out"
+    return
+  fi
+
+  # 케이스가 요구하는 skill·팀원이 세션에 실렸는지 본다. 안 실렸으면 규칙이 아니라 설치 문제다.
+  local miss="" kind key t list
+  for kind in skill:skills 필수에이전트:agents; do
+    key="${kind%%:*}"
+    list=$(loaded "$out" "${kind#*:}")
+    [ -n "$list" ] || continue
+    IFS=',' read -ra want_skills <<<"$(rule_get "$rule" "$key")"
+    for t in "${want_skills[@]}"; do
+      t="${t// /}"; [ -n "$t" ] || continue
+      printf '%s\n' "$list" | grep -qx "$t" || miss="$miss $t"
+    done
+  done
+  if [ -n "$miss" ]; then
+    printf 'E:설치 누락:%s (%s)\n' "$miss" "$sandbox/install.log"
     printf 'K:%s\n' "$out"
     return
   fi
