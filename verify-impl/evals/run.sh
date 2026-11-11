@@ -416,49 +416,23 @@ blank_quoted() {
   }'
 }
 
-# 케이스를 한 번 돌린다. 결과를 접두사로 구분해 표준출력에 낸다.
-#   R:<사유>  실패 사유. 한 줄도 없으면 통과
-#   W:<경고>  실패로는 안 세는 것
-#   K:<경로>  --keep 일 때 남긴 기록 파일
-run_once() { # <케이스이름> <규칙파일> <프롬프트파일>
-  local name="$1" rule="$2" txt="$3"
-  local sandbox cfg proj out before after status answer calls bash_cmds bash_recs first early hit bare err w c t e line rec orig bl i
+# 세션 기록 하나를 케이스 규칙으로 판정한다. 세션을 띄우지 않는다.
+# run_once 가 세션을 돌린 뒤 부르고, --rescore 가 보관한 기록으로 부른다.
+#   <sandbox> 세션이 돌던 샌드박스 경로. 기록 안의 절대경로가 이것으로 시작하면 샌드박스 안이다
+#   <proj> <cfg> 판정 때 읽을 프로젝트·설정 폴더. 다시 채점할 때는 보관 위치다
+#   <before> 세션 전 repo 워킹트리 상태. 인자를 안 주면 워킹트리 비교를 건너뛴다.
+#            깨끗한 repo 면 빈 문자열이 정상 값이라 "비어 있음" 으로 가르지 않는다
+# 출력: E:<환경 문제>  R:<실패 사유>  W:<경고>. R·E 가 없으면 통과다.
+judge() { # <규칙> <sandbox> <proj> <cfg> <out> [before]
+  local rule="$1" sandbox="$2" proj="$3" cfg="$4" out="$5" cmp=0 before=""
+  [ "$#" -ge 6 ] && { cmp=1; before="$6"; }
+  local status answer calls bash_cmds bash_recs first early hit bare err w c t e line rec orig bl i after
   local -a why warn needs bans bad ban tos leaks exs need want_skills want_agents want_files
-  sandbox=$(mktemp -d); cfg="$sandbox/.claude"; proj="$sandbox/proj"
-  mkdir -p "$cfg" "$proj"
-  [ -f "$CREDS" ] && { cp "$CREDS" "$cfg/.credentials.json"; chmod 600 "$cfg/.credentials.json"; }
-
-  # 개발자 모드가 꺼진 Windows 는 심볼릭 링크를 못 만든다. 임시 설치라 복사로 충분하다.
-  local copy=()
-  if ! ( cd "$sandbox" && : > .lt && MSYS=winsymlinks:nativestrict CYGWIN=winsymlinks:nativestrict ln -s .lt .lk ) 2>/dev/null; then
-    copy=(--copy)
-  fi
-  rm -f "$sandbox/.lt" "$sandbox/.lk"
-  CLAUDE_CONFIG_DIR="$cfg" "$REPO/install.sh" --global --yes "${copy[@]}" >"$sandbox/install.log" 2>&1 || {
-    printf 'R:설치 오류 (%s)\n' "$sandbox/install.log"; return; }
-
-  # 케이스가 가짜 프로젝트를 요구하면 만들어 둔다
-  ( cd "$proj" && git init -q ) 2>/dev/null
-  [ -f "$CASEDIR/$name.setup" ] && ( cd "$proj" && bash "$CASEDIR/$name.setup" ) >/dev/null 2>&1
-
-  # 슬래시로 시작하는 발화는 Claude Code 가 슬래시 명령으로 먹는다.
-  # "Unknown command: /nodes" 만 돌아오고 규칙은 시험되지도 않는다.
-  if split_messages "$txt" | tr '\0' '\n' | grep -q '^/'; then
-    printf 'E:프롬프트가 / 로 시작합니다. 슬래시 명령으로 먹히니 문장을 바꾸세요\n'
-    rm -rf "$sandbox"
-    return
-  fi
-
-  out="$sandbox/out.json"
-  before=$(git -C "$REPO" status --porcelain 2>/dev/null | sort)
-  run_session "$txt" "$proj" "$cfg" "$out"
-
   # 규칙을 보기 전에 세션이 제대로 돌았는지부터 본다. 로그인이 풀린 세션의
   # 빈 답변을 "규칙을 안 지켰다" 로 읽으면 그게 무음 실패다.
   err=$(session_error "$out" | head -1)
   if [ -n "$err" ]; then
     printf 'E:%s\n' "$(printf '%s' "$err" | cut -c1-120)"
-    printf 'K:%s\n' "$out"
     return
   fi
 
@@ -476,7 +450,6 @@ run_once() { # <케이스이름> <규칙파일> <프롬프트파일>
   done
   if [ -n "$miss" ]; then
     printf 'E:설치 누락:%s (%s)\n' "$miss" "$sandbox/install.log"
-    printf 'K:%s\n' "$out"
     return
   fi
 
@@ -495,8 +468,10 @@ EOF
 
   # Bash 로 우회해서 고치는 것까지는 위 검사로 못 잡는다. repo 워킹트리가
   # 바뀌었으면 알린다. 다른 세션이 만졌을 수도 있어 실패로는 세지 않는다.
-  after=$(git -C "$REPO" status --porcelain 2>/dev/null | sort)
-  [ "$before" != "$after" ] && warn+=("repo 워킹트리가 바뀜. 이 세션인지 다른 세션인지 확인 필요")
+  if [ "$cmp" -eq 1 ]; then
+    after=$(git -C "$REPO" status --porcelain 2>/dev/null | sort)
+    [ "$before" != "$after" ] && warn+=("repo 워킹트리가 바뀜. 이 세션인지 다른 세션인지 확인 필요")
+  fi
 
   # 반드시 나와야 하는 skill
   # 쉼표로 여러 개를 적으면 전부 불려야 한다. skill 이 skill 을 부르는 연계를 본다.
@@ -670,9 +645,50 @@ TMO
   local r
   for r in "${why[@]:-}";  do [ -n "$r" ] && printf 'R:%s\n' "$r"; done
   for r in "${warn[@]:-}"; do [ -n "$r" ] && printf 'W:%s\n' "$r"; done
-  # 실패한 회차의 기록은 --keep 없이도 남긴다. 기록이 필요해지는 시점은
+}
+
+# 케이스를 한 번 돌린다. 결과를 접두사로 구분해 표준출력에 낸다.
+#   R:<사유>  실패 사유. 한 줄도 없으면 통과
+#   W:<경고>  실패로는 안 세는 것
+#   K:<경로>  --keep 일 때 남긴 기록 파일
+run_once() { # <케이스이름> <규칙파일> <프롬프트파일>
+  local name="$1" rule="$2" txt="$3"
+  local sandbox cfg proj out before
+  sandbox=$(mktemp -d); cfg="$sandbox/.claude"; proj="$sandbox/proj"
+  mkdir -p "$cfg" "$proj"
+  [ -f "$CREDS" ] && { cp "$CREDS" "$cfg/.credentials.json"; chmod 600 "$cfg/.credentials.json"; }
+
+  # 개발자 모드가 꺼진 Windows 는 심볼릭 링크를 못 만든다. 임시 설치라 복사로 충분하다.
+  local copy=()
+  if ! ( cd "$sandbox" && : > .lt && MSYS=winsymlinks:nativestrict CYGWIN=winsymlinks:nativestrict ln -s .lt .lk ) 2>/dev/null; then
+    copy=(--copy)
+  fi
+  rm -f "$sandbox/.lt" "$sandbox/.lk"
+  CLAUDE_CONFIG_DIR="$cfg" "$REPO/install.sh" --global --yes "${copy[@]}" >"$sandbox/install.log" 2>&1 || {
+    printf 'R:설치 오류 (%s)\n' "$sandbox/install.log"; return; }
+
+  # 케이스가 가짜 프로젝트를 요구하면 만들어 둔다
+  ( cd "$proj" && git init -q ) 2>/dev/null
+  [ -f "$CASEDIR/$name.setup" ] && ( cd "$proj" && bash "$CASEDIR/$name.setup" ) >/dev/null 2>&1
+
+  # 슬래시로 시작하는 발화는 Claude Code 가 슬래시 명령으로 먹는다.
+  # "Unknown command: /nodes" 만 돌아오고 규칙은 시험되지도 않는다.
+  if split_messages "$txt" | tr '\0' '\n' | grep -q '^/'; then
+    printf 'E:프롬프트가 / 로 시작합니다. 슬래시 명령으로 먹히니 문장을 바꾸세요\n'
+    rm -rf "$sandbox"
+    return
+  fi
+
+  out="$sandbox/out.json"
+  before=$(git -C "$REPO" status --porcelain 2>/dev/null | sort)
+  run_session "$txt" "$proj" "$cfg" "$out"
+
+  local res
+  res=$(judge "$rule" "$sandbox" "$proj" "$cfg" "$out" "$before")
+  printf '%s\n' "$res" | grep -v '^$'
+  # 실패한 회차와 돌리지 못한 회차의 기록은 --keep 없이도 남긴다. 기록이 필요해지는 시점은
   # 실패를 본 뒤인데, 그때 지워져 있으면 같은 것을 또 돌려야 한다.
-  if [ "$KEEP" -eq 1 ] || [ "${#why[@]}" -gt 0 ]; then
+  if [ "$KEEP" -eq 1 ] || printf '%s\n' "$res" | grep -q '^[RE]:'; then
     printf 'K:%s\n' "$out"
   else
     rm -rf "$sandbox"
