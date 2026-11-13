@@ -13,8 +13,10 @@
 #   SELF_UPDATE_CHECK_SEC : 원격 확인 주기(초). 기본 3600 (1시간)
 #
 # 하는 일
+#   0) 훅에서 불렸으면 바로 앞 check-install.sh 가 넘긴 링크 깨짐 알림(.jolla-skills.broken)을 맨 앞에 싣고 지운다
 #   1) 뒤에서 돈 업데이트가 남긴 알림(.jolla-skills.pending)이 있으면 먼저 내고 지운다. --quiet 여도 낸다
 #   2) 설치 기록에 autoupdate=off 가 있으면 더는 아무것도 안 한다
+#      뒤에서 돈 원격 확인이 실패했으면 그 이유를 한 줄 낸다. --quiet 에서는 같은 실패가 이어지는 동안 한 번만 낸다
 #   3) 이미 받아 둔 origin/main 과 비교한다. 네트워크는 안 쓴다
 #      뒤처졌고 조건이 맞으면 git merge --ff-only 로 당긴다
 #      조건: 브랜치 main, 추적 파일에 커밋 안 한 변경 없음, origin/main 에 없는 로컬 커밋 없음,
@@ -31,6 +33,8 @@
 #   .jolla-skills.notified    못 당긴다고 마지막으로 알린 것
 #   .jolla-skills.pending     뒤에서 돈 업데이트가 남긴 알림. 다음 세션 시작 때 내고 지운다
 #   .jolla-skills.lock        업데이트 중 잠금. 동시에 시작한 세션 중 하나만 당긴다
+#   .jolla-skills.broken      check-install.sh 가 훅에서 넘긴 링크 깨짐 알림. 같은 훅의 이 스크립트가 내고 지운다
+#   .jolla-skills.fetchfail   뒤에서 돈 원격 확인의 실패 이유. 알렸으면 둘째 줄에 told. 한 번 성공하면 지운다
 #   .jolla-skills.fetch.log   뒤에서 돌린 git fetch 와 그 뒤 비교의 마지막 출력
 #   .jolla-skills.install.log 뒤에서 돌린 재설치·why-hwp 받기의 마지막 출력
 #
@@ -67,6 +71,8 @@ LASTCHECK="$CFG/.jolla-skills.lastcheck"
 NOTIFIED="$CFG/.jolla-skills.notified"
 PENDING="$CFG/.jolla-skills.pending"
 LOCK="$CFG/.jolla-skills.lock"
+BROKEN_NOTE="$CFG/.jolla-skills.broken"
+FETCHFAIL="$CFG/.jolla-skills.fetchfail"
 FETCH_LOG="$CFG/.jolla-skills.fetch.log"
 INSTALL_LOG="$CFG/.jolla-skills.install.log"
 SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
@@ -166,6 +172,20 @@ flush_pending() {
   rm -f "$PENDING"
 }
 
+# 원격 확인 실패 이유 한 줄. git 이 낸 첫 줄(인증 거부, 이름 풀이 실패 등)을 쓴다.
+fetch_fail_reason() { # <rc> <git 출력>
+  local line
+  line=$(printf '%s\n' "$2" | tr -d '\r' | sed -n '/[^[:space:]]/{p;q;}')
+  if [ "$1" -eq 124 ]; then printf '%s초 안에 끝나지 않았습니다 (시간 초과)%s' "$FETCH_TO" "${line:+: $line}"
+  elif [ -n "$line" ]; then printf '%s' "$line"
+  else printf 'git fetch 가 rc=%s 로 끝났습니다' "$1"; fi
+}
+
+# 같은 이유면 그대로 둬서 이미 알렸다는 표시(told)를 지킨다. 이유가 바뀌면 새 실패로 보고 다시 알린다.
+record_fetch_fail() { # <이유>
+  [ "$(sed -n 1p "$FETCHFAIL" 2>/dev/null)" = "$1" ] || printf '%s\n' "$1" > "$FETCHFAIL"
+}
+
 manifest_get() { sed -n "s/^$1=//p" "$MANIFEST" 2>/dev/null | head -1; }
 
 # 같은 것을 세션마다 다시 알리지 않는다. 손으로 돌릴 때(--quiet 없음)는 매번 낸다.
@@ -248,10 +268,16 @@ bg_main() {
   local rc
   case "$BG" in
     fetch)
-      run_to "$FETCH_TO" git -C "$REPO" fetch --quiet origin "+refs/heads/main:refs/remotes/origin/main"
+      local out
+      out=$(run_to "$FETCH_TO" git -C "$REPO" fetch --quiet origin "+refs/heads/main:refs/remotes/origin/main" 2>&1 </dev/null)
       rc=$?
+      [ -n "$out" ] && printf '%s\n' "$out"
       echo "rc=$rc"
-      [ "$rc" -eq 0 ] || return 0
+      if [ "$rc" -ne 0 ]; then
+        record_fetch_fail "$(fetch_fail_reason "$rc" "$out")"
+        return 0
+      fi
+      rm -f "$FETCHFAIL"
       # 세션 시작은 잠금을 쥔 채 이 프로세스를 띄운다. 풀릴 때까지 기다린 뒤 받은 것을 바로 비교한다.
       for _ in $(seq 1 "$LOCK_WAIT"); do
         take_lock && break
@@ -293,6 +319,11 @@ bg_main() {
 }
 
 main() {
+  # 링크 깨짐 알림을 업데이트 알림보다 먼저 싣는다. 아래에서 어느 길로 일찍 끝나도 사라지지 않게 맨 앞에서 읽는다.
+  if [ "$HOOK" -eq 1 ] && [ -f "$BROKEN_NOTE" ]; then
+    HOOK_MSG="$(cat "$BROKEN_NOTE")"$'\n'
+    rm -f "$BROKEN_NOTE"
+  fi
   if [ ! -f "$MANIFEST" ]; then
     say "설치 기록이 없습니다: $MANIFEST"
     return 2
@@ -328,11 +359,21 @@ main() {
   local now last rc=0
   now=$(date +%s)
 
+  # 뒤에서 돈 원격 확인이 실패했으면 이유를 알린다. 실패가 이어지는 동안은 한 번만 낸다.
+  if [ -f "$FETCHFAIL" ] && [ "$NOW" -eq 0 ]; then
+    if [ "$QUIET" -eq 0 ] || [ "$(sed -n 2p "$FETCHFAIL")" != told ]; then
+      emit "skills 원격 확인(git fetch)에 실패했습니다: $(sed -n 1p "$FETCHFAIL") (로그: $FETCH_LOG)"
+      [ "$QUIET" -eq 1 ] && printf 'told\n' >> "$FETCHFAIL"
+    fi
+  fi
+
   if [ "$NOW" -eq 1 ]; then
     say "원격을 확인합니다: git -C $REPO fetch origin main"
     printf '%s\n' "$now" > "$LASTCHECK"
-    if ! run_to "$FETCH_TO" git -C "$REPO" fetch --quiet origin \
+    if run_to "$FETCH_TO" git -C "$REPO" fetch --quiet origin \
          "+refs/heads/main:refs/remotes/origin/main" </dev/null; then
+      rm -f "$FETCHFAIL"
+    else
       say "  원격 확인에 실패했습니다. 받아 둔 origin/main 과 비교합니다"
     fi
   fi

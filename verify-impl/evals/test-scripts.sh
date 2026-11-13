@@ -143,9 +143,71 @@ sys.exit(0 if ok else 1)' <<<"$out" 2>/dev/null; then ok; else bad "훅 JSON 이
   printf '%s\n' "$msg" > "$T/cfg/.jolla-skills.pending"
   out=$(env -u CLAUDE_PROJECT_DIR "$SU" --quiet "$T/cfg" </dev/null)
   [ "$out" = "$msg" ] && ok || bad "훅 밖의 --quiet 는 평문이어야 하는데: $out"
+
+  # 훅 명령은 install.sh 의 hook_cmd 그대로 돌린다. 훅 출력은 JSON 하나여야 Claude Code 가 읽는다.
+  eval "$(sed -n '/^hook_cmd() {/,/^}/p' "$REPO/install.sh")"
+  hook_json() { # <파이썬 식: d 는 읽은 JSON, m 은 systemMessage, M 은 환경 변수 M>  표준 입력이 훅 출력
+    M="${M:-}" python3 -c '
+import json, os, sys
+d = json.loads(sys.stdin.read())
+m = d["systemMessage"]
+M = os.environ["M"]
+ok = d["hookSpecificOutput"] == {"hookEventName": "SessionStart", "additionalContext": m} and ('"$1"')
+sys.exit(0 if ok else 1)' 2>/dev/null
+  }
+  mkdir -p "$T/cfg/skills"; ln -s "$REPO/shared" "$T/cfg/skills/shared"
+  printf 'path=skills/shared\npath=agents/없는.md\n' >> "$T/cfg/.jolla-skills.manifest"
+  HC=$(hook_cmd "$T/cfg")
+  # 링크 깨짐만: check-install 이 넘기고 self-update 가 JSON 하나로 낸다
+  out=$(CLAUDE_PROJECT_DIR="$T" bash -c "$HC" </dev/null)
+  printf '%s' "$out" | hook_json 'm.startswith("skills 설치가 깨져 있습니다 (2개 중 1개).\n  agents/없는.md (없어짐)")' \
+    && ok || bad "링크 깨짐 알림이 훅 JSON 하나로 안 나옴: $out"
+  [ ! -e "$T/cfg/.jolla-skills.broken" ] && ok || bad "넘긴 링크 깨짐 알림이 내고 나서도 남음"
+  # 링크 깨짐 + 업데이트: 둘이 JSON 하나로 합쳐진다
+  git -C "$T/r" -c user.name=t -c user.email=t@t commit -q --allow-empty -m b
+  git -C "$T/r" update-ref refs/remotes/origin/main HEAD
+  git -C "$T/r" reset -q --hard HEAD~1
+  out=$(CLAUDE_PROJECT_DIR="$T" bash -c "$HC" </dev/null)
+  printf '%s' "$out" | hook_json 'm.startswith("skills 설치가 깨져 있습니다") and "\nskills 를 " in m and "업데이트했습니다 (커밋 1개)" in m' \
+    && ok || bad "업데이트 알림과 링크 깨짐 알림이 JSON 하나로 안 합쳐짐: $out"
+  # self-update.sh 를 부를 수 없으면 check-install 이 스스로 JSON 을 낸다
+  mkdir -p "$T/c2"; printf 'mode=link\nrepo=%s\npath=agents/없는.md\n' "$T/r" > "$T/c2/.jolla-skills.manifest"
+  out=$(CLAUDE_PROJECT_DIR="$T" "$REPO/shared/scripts/check-install.sh" --quiet "$T/c2" </dev/null)
+  printf '%s' "$out" | hook_json 'm.startswith("skills 설치가 깨져 있습니다 (1개 중 1개).")' \
+    && ok || bad "self-update 가 없을 때 check-install 이 JSON 을 안 냄: $out"
+  [ ! -e "$T/c2/.jolla-skills.broken" ] && ok || bad "self-update 가 없는데 넘김 파일을 남김"
+  # self-update.sh 가 생기기 전에 건 훅(check-install 만 부름)이면 넘기지 않고 스스로 낸다
+  printf '{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"S=x/check-install.sh"}]}]}}\n' > "$T/cfg/settings.json"
+  out=$(CLAUDE_PROJECT_DIR="$T" "$REPO/shared/scripts/check-install.sh" --quiet "$T/cfg" </dev/null)
+  printf '%s' "$out" | hook_json 'm.startswith("skills 설치가 깨져 있습니다 (2개 중 1개).")' \
+    && ok || bad "옛 훅(self-update 안 부름)인데 check-install 이 JSON 을 안 냄: $out"
+  rm "$T/cfg/settings.json"
+  # 검사 스크립트에 못 닿음: hook_cmd 의 대체 출력도 JSON 이고 경로가 그대로 실린다
+  P="$T/옮긴 '설정' \\d"
+  out=$(CLAUDE_PROJECT_DIR="$T" bash -c "$(hook_cmd "$P")" </dev/null)
+  printf '%s' "$out" | M="$P/skills/shared" hook_json '"검사 스크립트에 닿지 못합니다 (" + M + ")" in m' \
+    && ok || bad "검사 스크립트에 못 닿을 때 훅 JSON 이 아니거나 경로가 다름: $out"
+  # 뒤에서 돈 원격 확인 실패: 다음 세션에 이유가 한 번 뜨고, 이어지는 동안은 안 뜨고, 성공하면 다시 센다
+  git -C "$T/r" remote add origin "$T/없는-원격"
+  "$SU" --bg-fetch "$T/cfg" >"$T/cfg/.jolla-skills.fetch.log" 2>&1
+  out=$(CLAUDE_PROJECT_DIR="$T" "$SU" --quiet "$T/cfg" </dev/null)
+  printf '%s' "$out" | hook_json 'm.startswith("skills 원격 확인(git fetch)에 실패했습니다: ") and "없는-원격" in m' \
+    && ok || bad "원격 확인 실패 이유가 훅 JSON 으로 안 나옴: $out"
+  "$SU" --bg-fetch "$T/cfg" >"$T/cfg/.jolla-skills.fetch.log" 2>&1
+  out=$(CLAUDE_PROJECT_DIR="$T" "$SU" --quiet "$T/cfg" </dev/null)
+  [ -z "$out" ] && ok || bad "같은 원격 확인 실패를 또 알림: $out"
+  git init -q --bare "$T/o.git" && git -C "$T/r" push -q "$T/o.git" HEAD:refs/heads/main
+  git -C "$T/r" remote set-url origin "$T/o.git"
+  "$SU" --bg-fetch "$T/cfg" >"$T/cfg/.jolla-skills.fetch.log" 2>&1
+  [ ! -e "$T/cfg/.jolla-skills.fetchfail" ] && ok || bad "원격 확인이 성공했는데 실패 기록이 남음"
+  git -C "$T/r" remote set-url origin "$T/없는-원격"
+  "$SU" --bg-fetch "$T/cfg" >"$T/cfg/.jolla-skills.fetch.log" 2>&1
+  out=$(CLAUDE_PROJECT_DIR="$T" "$SU" --quiet "$T/cfg" </dev/null)
+  printf '%s' "$out" | hook_json 'm.startswith("skills 원격 확인(git fetch)에 실패했습니다: ")' \
+    && ok || bad "성공 뒤 다시 실패했는데 안 알림: $out"
   rm -r "$T"
 else
-  skip "python3 가 없어 self-update 훅 JSON 3건"
+  skip "python3 가 없어 self-update 훅 JSON 14건"
 fi
 
 echo "== 나머지 스크립트"

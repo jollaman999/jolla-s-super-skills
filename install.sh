@@ -265,8 +265,15 @@ lang_cmd() { # <설치위치>
 }
 
 # 링크 검사 뒤에 자동 업데이트(self-update.sh)를 부른다. 원격 확인은 떼어서 띄우므로 기다리지 않는다.
+# 검사 스크립트에 못 닿을 때의 알림은 settings.json 에 박히므로 python 없이 셸만으로 훅 JSON 을 낸다.
+# 훅의 평문 출력은 사용자 화면에 안 뜬다. 경로는 여기서 JSON 문자열로, 이어서 셸 작은따옴표 안에 맞게 바꿔 넣는다.
 hook_cmd() { # <설치위치>
-  printf 'S="%s/skills/shared/scripts/check-install.sh"; U="%s/skills/shared/scripts/self-update.sh"; if [ -x "$S" ]; then "$S" --quiet "%s" || true; if [ -x "$U" ]; then "$U" --quiet "%s" || true; fi; else echo "skills 설치가 깨졌습니다: 검사 스크립트에 닿지 못합니다 (%s/skills/shared). repo 를 옮겼거나 지웠는지 보세요"; fi; exit 0' "$1" "$1" "$1" "$1" "$1"
+  local m j
+  m="skills 설치가 깨졌습니다: 검사 스크립트에 닿지 못합니다 ($1/skills/shared). repo 를 옮겼거나 지웠는지 보세요"
+  m=${m//\\/\\\\}; m=${m//\"/\\\"}; m=${m//$'\t'/\\t}; m=${m//$'\n'/\\n}; m=${m//$'\r'/\\r}
+  j='{"systemMessage":"'"$m"'","hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"'"$m"'"}}'
+  j=${j//\'/\'\\\'\'}
+  printf 'S="%s/skills/shared/scripts/check-install.sh"; U="%s/skills/shared/scripts/self-update.sh"; if [ -x "$S" ]; then "$S" --quiet "%s" || true; if [ -x "$U" ]; then "$U" --quiet "%s" || true; fi; else printf '"'"'%%s\\n'"'"' '"'"'%s'"'"'; fi; exit 0' "$1" "$1" "$1" "$1" "$j"
 }
 
 # JSON 을 손으로 자르지 않는다. settings.json 은 사용자 파일이고 남의 훅이 들어 있을 수 있다.
@@ -422,7 +429,7 @@ PS1EOF
 # 자동 업데이트(self-update.sh)가 남긴 확인 시각·알림 기록·못 낸 알림·잠금·로그는 어느 쪽이든 지운다.
 remove_state() {
   local f
-  for f in lastcheck notified pending lock fetch.log install.log; do
+  for f in lastcheck notified pending lock broken fetchfail fetch.log install.log; do
     [ -e "$DEST/.jolla-skills.$f" ] || continue
     say "  제거   .jolla-skills.$f"; run rm -f "$DEST/.jolla-skills.$f"
   done
