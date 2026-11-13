@@ -5,6 +5,8 @@
 # usage: self-update.sh [설정디렉터리] [--quiet] [--now]
 #   설정디렉터리 : 기본 $CLAUDE_CONFIG_DIR, 없으면 ~/.claude. 프로젝트 설치면 <프로젝트>/.claude
 #   --quiet      : 업데이트했거나 못 했을 때만 출력한다 (SessionStart 훅이 쓰는 형태)
+#                  훅이 부르면(CLAUDE_PROJECT_DIR 가 있고 표준 출력이 터미널이 아님) 알림을 훅 JSON 하나로 낸다.
+#                  systemMessage 는 사용자 화면에, additionalContext 는 Claude 맥락에 간다
 #   --now        : 원격 확인 주기를 무시하고 지금 원격을 확인한다. 받을 때까지 기다린다 (최대 60초)
 #
 # 환경 변수
@@ -74,10 +76,40 @@ export GIT_TERMINAL_PROMPT=0       # 자격 증명을 물으며 멈추지 않게
 say(){ [ "$QUIET" -eq 1 ] || printf '%s\n' "$*"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# SessionStart 훅의 평문 출력은 Claude 맥락에만 가고 사용자 화면에는 안 뜬다.
+# 훅이 부를 때는 알림을 모았다가 끝에서 JSON 하나로 낸다. 터미널에서 --quiet 로 돌리면 평문 그대로다.
+HOOK=0
+[ "$QUIET" -eq 1 ] && [ -z "$BG" ] && [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ ! -t 1 ] && HOOK=1
+HOOK_MSG=""
+
 # 알림 한 줄. --quiet 이어도 낸다. 뒤에서 돌 때는 화면이 없으므로 다음 세션 시작이 낼 수 있게 pending 에도 덧붙인다.
 emit() {
   [ -n "$BG" ] && printf '%s\n' "$*" >> "$PENDING"
-  printf '%s\n' "$*"
+  if [ "$HOOK" -eq 1 ]; then HOOK_MSG="$HOOK_MSG$*"$'\n'; else printf '%s\n' "$*"; fi
+}
+
+# 표준 입력을 JSON 문자열 하나로 바꾼다. python 이 없는 Git Bash 에서도 돌게 awk 로 한다.
+# 바이트 단위로 보므로 한글(UTF-8)은 그대로 지나가고, 따옴표·역슬래시·제어 문자만 바꾼다. 마지막 줄바꿈은 뺀다.
+json_str() {
+  LC_ALL=C awk '
+    BEGIN {
+      for (i = 1; i < 32; i++) esc[sprintf("%c", i)] = sprintf("\\u%04x", i)
+      esc["\t"] = "\\t"; esc["\r"] = "\\r"; esc["\""] = "\\\""; esc["\\"] = "\\\\"
+    }
+    {
+      s = ""; n = length($0)
+      for (i = 1; i <= n; i++) { c = substr($0, i, 1); s = s ((c in esc) ? esc[c] : c) }
+      out = (NR > 1) ? out "\\n" s : s
+    }
+    END { printf "\"%s\"", out }'
+}
+
+# 모은 알림을 훅 JSON 으로 낸다. 알릴 것이 없으면 아무것도 안 낸다.
+hook_flush() {
+  [ "$HOOK" -eq 1 ] && [ -n "$HOOK_MSG" ] || return 0
+  local m
+  m=$(printf '%s' "${HOOK_MSG%$'\n'}" | json_str)
+  printf '{"systemMessage":%s,"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":%s}}\n' "$m" "$m"
 }
 
 TIMEOUT_BIN=""
@@ -130,7 +162,7 @@ release_lock() { [ "$LOCKED" -eq 1 ] && [ "$HANDED" -eq 0 ] && rm -f "$LOCK"; }
 # pending 은 잠금을 쥔 쪽만 쓰고 지운다. 그래서 덧붙이는 중에 지워 줄을 잃는 일이 없다.
 flush_pending() {
   [ -e "$PENDING" ] || return 0
-  cat "$PENDING"
+  if [ "$HOOK" -eq 1 ]; then HOOK_MSG="$HOOK_MSG$(cat "$PENDING")"$'\n'; else cat "$PENDING"; fi
   rm -f "$PENDING"
 }
 
@@ -348,4 +380,4 @@ main() {
 }
 
 # 복사 설치는 재설치가 이 파일을 지우고 다시 놓는다. 끝까지 읽어 둔 뒤 실행하도록 한 줄로 끝낸다.
-main; exit $?
+main; rc=$?; hook_flush; exit "$rc"

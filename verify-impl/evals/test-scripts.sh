@@ -118,6 +118,36 @@ else
   skip "python3 가 없어 session-guard 7건"
 fi
 
+echo "== self-update 훅 JSON"
+# SessionStart 훅의 평문은 사용자 화면에 안 뜬다. 훅이 부르면 알림을 systemMessage·additionalContext JSON 하나로 내야 한다.
+# 되읽기는 스크립트와 따로 python json 으로 한다. 같은 이스케이프로 되읽으면 같이 틀려도 통과한다.
+SU="$REPO/shared/scripts/self-update.sh"
+if command -v python3 >/dev/null 2>&1; then
+  T=$(mktemp -d)
+  git init -q -b main "$T/r" && git -C "$T/r" -c user.name=t -c user.email=t@t commit -q --allow-empty -m a
+  git -C "$T/r" update-ref refs/remotes/origin/main HEAD
+  mkdir -p "$T/cfg"
+  printf 'mode=link\nrepo=%s\nscope=global\n' "$T/r" > "$T/cfg/.jolla-skills.manifest"
+  date +%s > "$T/cfg/.jolla-skills.lastcheck"
+  msg=$(printf '한글 "따옴표" 역\\슬래시 탭\t벨\a ESC\033[0m\n둘째 줄')
+  printf '%s\n' "$msg" > "$T/cfg/.jolla-skills.pending"
+  out=$(CLAUDE_PROJECT_DIR="$T" "$SU" --quiet "$T/cfg" </dev/null)
+  if M="$msg" python3 -c '
+import json, os, sys
+d = json.loads(sys.stdin.read())
+m = os.environ["M"]
+ok = d["systemMessage"] == m and d["hookSpecificOutput"] == {"hookEventName": "SessionStart", "additionalContext": m}
+sys.exit(0 if ok else 1)' <<<"$out" 2>/dev/null; then ok; else bad "훅 JSON 이 알림 원문과 다르다: $out"; fi
+  out=$(CLAUDE_PROJECT_DIR="$T" "$SU" --quiet "$T/cfg" </dev/null)
+  [ -z "$out" ] && ok || bad "최신이고 알릴 것이 없으면 아무것도 안 내야 하는데: $out"
+  printf '%s\n' "$msg" > "$T/cfg/.jolla-skills.pending"
+  out=$(env -u CLAUDE_PROJECT_DIR "$SU" --quiet "$T/cfg" </dev/null)
+  [ "$out" = "$msg" ] && ok || bad "훅 밖의 --quiet 는 평문이어야 하는데: $out"
+  rm -r "$T"
+else
+  skip "python3 가 없어 self-update 훅 JSON 3건"
+fi
+
 echo "== 나머지 스크립트"
 rc_is 1 "health-wait 타임아웃은 1" "$S/health-wait.sh" http://127.0.0.1:59999/ 6 2
 rc_is 0 "scan-targets 는 항상 0"   "$S/scan-targets.sh" "$REPO"
