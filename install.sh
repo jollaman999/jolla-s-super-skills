@@ -413,10 +413,10 @@ PS1EOF
 
 # --- 해제 ---
 # 기록(manifest)이 있으면 거기 적힌 것만 지운다. 없으면 예전 방식대로 링크만 본다.
-# 자동 업데이트(self-update.sh)가 남긴 확인 시각·알림 기록·잠금·로그는 어느 쪽이든 지운다.
+# 자동 업데이트(self-update.sh)가 남긴 확인 시각·알림 기록·못 낸 알림·잠금·로그는 어느 쪽이든 지운다.
 remove_state() {
   local f
-  for f in lastcheck notified lock fetch.log install.log; do
+  for f in lastcheck notified pending lock fetch.log install.log; do
     [ -e "$DEST/.jolla-skills.$f" ] || continue
     say "  제거   .jolla-skills.$f"; run rm -f "$DEST/.jolla-skills.$f"
   done
@@ -687,7 +687,7 @@ else
   say
   say "설치가 깨졌는지 알리고 skills 를 원격에 맞춰 두는 훅을 세션 시작 때 걸 수 있습니다."
   say "  하는 일: 설치한 ${#PLACED[@]}개가 살아 있는지 본다 (읽기만)"
-  say "           6시간에 한 번 뒤에서 git fetch 하고, 받아 둔 origin/main 보다 뒤처졌으면"
+  say "           1시간에 한 번 뒤에서 git fetch 하고, 받아 둔 origin/main 보다 뒤처졌으면"
   say "           main 이고 커밋 안 한 변경·앞선 로컬 커밋이 없을 때만 git merge --ff-only 로 당긴다"
   say "  깨졌거나 업데이트했거나 못 했을 때만 말합니다. 자동 업데이트만 끄려면 $MANIFEST 에 autoupdate=off"
   if [ -z "$PY" ] && [ -z "$PS" ]; then
