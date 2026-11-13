@@ -37,7 +37,7 @@
 ```
 
 확인용 PNG 는 스크래치패드에 둔다. 산출물이 아니다.
-svg2png 는 Chrome → Edge → Chromium → Firefox 순으로 브라우저를 찾는다. 하나도 없으면 렌더를 못 했다고 보고한다.
+svg2png 는 why-hwp 에 든 엔진으로 그려서 브라우저가 필요 없다. **글자는 SVG 에 넣은 폰트로만 그린다.** PC 에 깔린 폰트는 쓰지 않으므로 9절 2번(`svgfont`)을 먼저 돌린다. 폰트가 없는 SVG 는 글자 없이 그려지고 stderr 에 경고가 나온다.
 
 ## 3. 스타일 A: 발표 슬라이드형
 
@@ -182,7 +182,7 @@ svg2png 는 Chrome → Edge → Chromium → Firefox 순으로 브라우저를 �
 
 ## 9. 폰트 넣기와 검사
 
-why-hwp 의 `svgfont`·`svgcheck` 로 한다 (why-hwp v0.2.0 이상). 둘 다 TrueType(`.ttf`) 폰트만 받는다.
+why-hwp 의 `svgfont`·`svgcheck` 로 한다 (why-hwp v0.3.0 이상). 둘 다 TrueType(`.ttf`) 폰트만 받는다.
 CFF(`.otf`), 가변 폰트(`NotoSansKR-VF.ttf` 같은 것), `.ttc` 는 거절한다.
 
 | 순서 | 명령 | 무엇을 보나 |
@@ -194,7 +194,7 @@ CFF(`.otf`), 가변 폰트(`NotoSansKR-VF.ttf` 같은 것), `.ttc` 는 거절한
 
 | 함정 | 어떻게 |
 |------|--------|
-| 쓸 폰트를 못 찾음 | `svgfont`·`svgcheck` 는 Noto Sans KR → 나눔고딕 → 나눔스퀘어 → 맑은 고딕 순으로 찾는다. 없으면 정적 Noto Sans KR TTF 를 설치하거나 `-regular`·`-bold` 로 파일을 준다. **어느 폰트가 들어갔는지 보고한다** (stderr 첫 줄) |
+| 쓸 폰트를 못 찾음 | `svgfont`·`svgcheck` 는 OS 폰트 폴더에서 Noto Sans KR → 나눔고딕 → 나눔스퀘어 → 맑은 고딕 순으로 찾고, 그다음 why-hwp 글꼴 캐시를 본다. 그래도 없으면 나눔고딕(OFL)을 받아 쓴다. 다른 폰트를 쓰려면 `-regular`·`-bold` 로 파일을 준다. **어느 폰트가 들어갔는지 보고한다** (stderr 첫 줄) |
 | 폰트 라이선스 | 공개 문서에 넣는 폰트는 사용자가 정한다. Noto Sans KR 은 OFL 이다. 맑은 고딕은 "문서에 넣기 허용" 표시가 있지만 공개 배포는 따로 판단할 일이다. 나눔스퀘어는 파일에서 라이선스를 확인하지 못했다 |
 | 폰트에 모양이 없는 글자 | `svgfont` 가 stderr 에 알린다. 나눔스퀘어는 자주 쓰는 2350자 밖의 한글을 빈칸으로 그린다. 알림이 나오면 다른 폰트로 바꾸거나 낱말을 바꾼다 |
 | `svgcheck` 가 못 보는 것 | 곡선·호가 든 path, translate 가 아닌 transform. notes 에 나온다. 그 부분은 3번에서 눈으로 본다 |

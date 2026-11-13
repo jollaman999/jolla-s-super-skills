@@ -60,7 +60,7 @@ SHA256SUMS 로 확인한 뒤 `doc-write/bin/` 에 둡니다. 못 받아도 설�
 bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh            # 없으면 받는다
 bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh --check    # 무엇을 쓰는지만 본다
 bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh --force    # 새 릴리즈로 바꾼다
-WHY_HWP_VERSION=v0.2.0 bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh   # 버전을 정해서
+WHY_HWP_VERSION=v0.3.0 bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh   # 버전을 정해서
 ```
 
 | 상황 | 어떻게 |
@@ -69,7 +69,7 @@ WHY_HWP_VERSION=v0.2.0 bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh 
 | 사내 미러 | `WHY_HWP_BASE_URL` 과 `WHY_HWP_VERSION` 을 같이 줍니다 |
 | 최소 버전 | 스크립트의 `MIN_VERSION` 보다 낮으면 쓰지 않고 알립니다 |
 
-`convert`(hwp ↔ hwpx, pdf)는 한컴오피스가 깔린 Windows 에서만 됩니다.
+`convert`(hwp ↔ hwpx, pdf, txt)와 `svg2png` 는 why-hwp 에 든 엔진으로 Windows·Linux·macOS 어디서나 됩니다. PDF 는 한글 인쇄의 근사라 모양 확인용이고, 한글과 똑같은 PDF 는 한컴오피스가 깔린 Windows 에서 `convert -engine hancom` 으로 만듭니다.
 
 ## 참고 문서
 

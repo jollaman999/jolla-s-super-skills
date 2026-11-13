@@ -16,7 +16,7 @@
 #
 # 환경 변수
 #   WHY_HWP_BIN      위 1). 상대 경로는 현재 폴더 기준으로 본다. PATH 에서 찾지 않는다
-#   WHY_HWP_VERSION  받을 버전 (예 v0.2.0). 없으면 최신 릴리즈
+#   WHY_HWP_VERSION  받을 버전 (예 v0.3.0). 없으면 최신 릴리즈
 #   WHY_HWP_BASE_URL 릴리즈 파일을 받을 곳. 기본 https://github.com/jollaman999/why-hwp/releases/download
 #                    사내 미러나 file:// 로 바꿀 때 쓴다. 최신 버전은 못 찾으니 WHY_HWP_VERSION 을 같이 준다
 #
@@ -25,7 +25,7 @@ set -uo pipefail
 
 REPO_SLUG="jollaman999/why-hwp"
 # skill 문서가 기대하는 명령이 들어간 첫 버전. 이보다 낮으면 쓰지 않는다.
-MIN_VERSION="v0.2.0"
+MIN_VERSION="v0.3.0"
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST="$(dirname "$HERE")/bin"

@@ -80,7 +80,7 @@ WH=$(bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh --which) || echo "
 | 자료 | 여는 법 |
 |------|---------|
 | `.hwpx`, `.hwp`, `.docx` | `"$WH" text <파일>`, `"$WH" info <파일>`. 변경 추적이 있으면 `-view original`·`markup` 도 본다 (`hwp.md` 2절) |
-| 양식 모양 | 한글이 깔린 Windows 면 `"$WH" convert -to pdf` 로 PDF 를 만들어 Read 로 쪽을 본다 |
+| 양식 모양 | `"$WH" convert -to pdf` 로 PDF 를 만들어 Read 로 쪽을 본다. 한글 인쇄의 근사라 문서 글꼴이 없는 PC 에서는 글자 위치가 조금 다르다 (`hwp.md` 2절) |
 | `.pdf`, 이미지 | Read (PDF 는 `pages` 로 나눠 읽는다) |
 | `.pptx` | zip 이다. `unzip -l` 로 슬라이드 목록, `unzip -p <파일> ppt/slides/slideN.xml` 의 `<a:t>` 가 글자다 |
 | md, txt, 코드 | Read |

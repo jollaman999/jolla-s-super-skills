@@ -21,12 +21,12 @@ WH=$(bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh --which) || echo "
 
 | 명령 | 하는 일 | 플랫폼 |
 |------|---------|--------|
-| `text [-format plain\|json] [-view accepted\|original\|markup] <파일>` | `.hwpx`·`.hwp`·`.docx` 글을 `<위치><TAB><글>` 로. `s0/p12` 는 0번 구역 12번 문단, `s0/p3/t0/r1/c2` 는 3번 문단 첫 표의 1행 2열. **메모 본문·머리말·꼬리말·각주는 빠진다** | 전부 |
+| `text [-format plain\|json] [-view accepted\|original\|markup] <파일>` | `.hwpx`·`.hwp`·`.docx` 글을 `<위치><TAB><글>` 로. `s0/p12` 는 0번 구역 12번 문단, `s0/p3/t0/r1/c2` 는 3번 문단 첫 표의 1행 2열. 문단이 여러 개인 칸은 문단마다 `.../c2/p0`, `.../c2/p1` 로 한 줄씩 나온다. 글상자 안의 글은 `s0/p0#box` 줄로 따로 나오고 **읽기 전용**이다 (`apply` 가 거절한다). **메모 본문·머리말·꼬리말·각주는 빠진다** | 전부 |
 | `info [-format plain\|json] [-view ...] <파일>` | 구역·문단 수, 표와 크기, `(A)`·`(A/B)` 담당 표기와 위치, 메모(본문 포함), 변경 추적 수, 스타일, 그림 | 전부 |
-| `apply -spec 편집.json -o 결과.hwpx -author 이름 [-no-track] <입력.hwpx>` | 편집을 변경 추적으로 남긴 사본을 만든다. 4절 | 전부 |
+| `apply -spec 편집.json -o 결과.hwpx -author 이름 [-no-track] <입력.hwpx\|.hwp>` | 편집을 변경 추적으로 남긴 사본을 만든다. `.hwp` 는 why-hwp 에 든 엔진으로 hwpx 로 바꾼 뒤 고친다. 4절 | 전부 |
 | `verify [-orig 원본] [-allow 위치.txt] [-banned 금지어.txt] <파일>` | 원본 대비 바뀐 곳, 사라진 메모·표·그림·변경 추적, 금지어, em dash. 위반이면 종료 코드 1. 5절 | 전부 |
-| `convert [-to hwp\|hwpx\|pdf\|txt] [-o 출력] [-force] <입력>` | 설치된 한컴오피스로 변환. 출력이 있으면 `-force` 없이는 안 덮어쓴다 | 한글이 깔린 Windows |
-| `svg2png`, `svgfont`, `svgcheck` | 그림. `figures.md` 9절 | 브라우저·폰트 있는 곳 |
+| `convert [-to hwp\|hwpx\|pdf\|txt] [-o 출력] [-force] [-engine builtin\|hancom] <입력>` | 기본은 why-hwp 에 든 엔진(rhwp)으로 변환한다. hwp ↔ hwpx 는 한글과 같은 결과다. PDF 는 한글 인쇄의 근사라 모양 확인용이다 (아래). `-engine hancom` 은 설치된 한컴오피스로 변환해 한글 인쇄와 똑같은 PDF 를 만들고 `.docx` 도 받는다. 출력이 있으면 `-force` 없이는 안 덮어쓴다 | 전부. `-engine hancom` 은 한글이 깔린 Windows |
+| `svg2png`, `svgfont`, `svgcheck` | 그림. `figures.md` 9절. `svg2png` 는 why-hwp 에 든 엔진으로 그려 브라우저가 필요 없다 | 전부 |
 | `version` | 버전 | 전부 |
 
 | 보기 (`-view`) | 무엇 |
@@ -36,7 +36,9 @@ WH=$(bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh --which) || echo "
 | `markup` | 넣은 글 `[+글+]`, 지운 글 `[-글-]` |
 
 `.hwp` 도 `text`·`info`·`verify` 로 바로 읽는다. 다만 변경 추적이 든 `.hwp` 는 보기를 나누지 못해 지운 글과 넣은 글이 섞여 나온다.
-**`.hwp` 는 바로 고치지 못한다.** `convert -to hwpx` 로 사본을 만들어 고친다. 한글이 없는 곳이면 hwpx 로 달라고 한다.
+**`.hwp` 는 `apply` 에 그대로 넣어도 된다.** why-hwp 에 든 엔진이 hwpx 로 바꾼 뒤 고치고, 결과는 hwpx 다. 바꾸면서 빠지는 것이 있을 수 있어 `verify -orig 원본.hwp 결과.hwpx` 로 본다.
+
+**PDF 는 모양 확인용이다.** 기본 엔진의 PDF 는 한글 인쇄와 아주 가깝지만 같지는 않다. 문서의 글꼴(한컴·Windows 글꼴)이 없는 PC 에서는 대신 쓰는 글꼴 때문에 글자 위치가 1~2pt 쯤 어긋날 수 있다. 표가 깨졌는지, 쪽이 밀렸는지, 그림이 영역 안에 있는지는 볼 수 있다. 한글과 똑같은 PDF 가 필요하면 한글이 깔린 Windows 에서 `-engine hancom` 으로 만든다.
 
 ## 3. 작업 순서
 
@@ -44,9 +46,9 @@ WH=$(bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh --which) || echo "
 |---|-------|-----------|
 | 1 | 원본을 복사한다. 원본은 고치지 않는다 | 사본 이름은 폴더 파일명 규칙의 다음 버전 |
 | 2 | 구조와 글을 뽑는다 | `"$WH" info 원본`, `"$WH" text 원본 > 원본.txt`. 메모 수, 변경 추적 수, 담당 표기를 적어 둔다 |
-| 3 | 모양을 본다 (Windows) | `"$WH" convert -to pdf -o 원본.pdf 원본` 후 Read 로 쪽을 본다 |
+| 3 | 모양을 본다 | `"$WH" convert -to pdf -o 원본.pdf 원본` 후 Read 로 쪽을 본다 |
 | 4 | 분석·질문 (`questions.md`) | 변경 추적 저자 이름(`-author`)도 이때 묻는다. 한글 검토 화면에 그대로 보인다 |
-| 5 | `.hwp` 면 hwpx 사본을 만든다 | `"$WH" convert -to hwpx -o 사본.hwpx 원본.hwp`. 위치는 **이 사본의** `text` 로 다시 뽑는다 |
+| 5 | `.hwp` 면 hwpx 사본을 만든다 | `"$WH" convert -to hwpx -o 사본.hwpx 원본.hwp`. 위치는 **이 사본의** `text` 로 다시 뽑는다. `apply` 에 `.hwp` 를 바로 넣어도 되지만 사본을 두면 무엇을 고쳤는지 비교하기 쉽다 |
 | 6 | 그림을 만든다 | `figures.md` 9절: `svgfont` → `svgcheck` → `svg2png -width-mm <영역 mm>` |
 | 7 | 편집 명세를 쓰고 적용한다 | 4절 |
 | 8 | 검증한다 | 5절 |
@@ -59,7 +61,7 @@ hwpx 의 XML 을 손으로 고치지 않는다. `apply` 가 아래를 대신 한
 | `apply` 가 하는 일 | 손으로 할 때 틀렸던 것 |
 |--------------------|------------------------|
 | 고친 문단의 `linesegarray` 를 지운다 | 남기면 한글이 앞쪽 일부 쪽까지만 연다 (19쪽에서 멈춘 일) |
-| 새 문단은 `like`(없으면 `loc`) 문단의 문단·스타일·글자 모양을 쓴다 | 새 서식 ID 를 만들면 header 와 어긋난다 |
+| 새 문단은 `like`(없으면 `loc`) 문단의 문단·스타일 모양을 쓴다. 글자 모양은 한글에서 Enter 로 문단을 나눌 때와 같다: 뒤에 넣으면 `loc` 끝의 것, 앞에 넣으면 `loc` 첫 글자의 것, `like` 가 있으면 `like` 의 글 있는 첫 조각의 것 | 새 서식 ID 를 만들면 header 와 어긋난다. 글자 모양이 섞인 문단에서 첫 글자 모양을 쓰면 한글과 줄 높이가 달라져 쪽이 밀렸다 |
 | 넣은 글·지운 글을 변경 추적으로 감싸고 header 목록과 저자를 맞춘다 | 목록과 본문 표시가 어긋나면 변경 추적이 깨진다 |
 | 고치지 않은 문단은 바이트 그대로, 메모 보존 | 남의 메모와 남의 칸을 건드린 일 |
 | 그림은 PNG 를 손대지 않고 넣고 manifest 를 맞춘다 | `binaryItemIDRef` 가 어긋나면 그림이 안 나온다 |
@@ -83,7 +85,7 @@ hwpx 의 XML 을 손으로 고치지 않는다. `apply` 가 아래를 대신 한
 "$WH" apply -spec 편집.json -o 결과.hwpx -author "<물어서 정한 이름>" 사본.hwpx
 ```
 
-`apply` 로 안 되는 편집(표 행 추가, 머리말 수정 등)이면 XML 을 손으로 고치지 않는다. 안 된다고 알리고 사용자에게 한글에서 할 일을 위치와 함께 적어 준다.
+`apply` 로 안 되는 편집(표 행 추가, 머리말 수정, 글상자 안의 글 등)이면 XML 을 손으로 고치지 않는다. 안 된다고 알리고 사용자에게 한글에서 할 일을 위치와 함께 적어 준다.
 
 ## 5. 검증
 
@@ -93,8 +95,8 @@ hwpx 의 XML 을 손으로 고치지 않는다. `apply` 가 아래를 대신 한
 | 메모 | `info` 의 메모 수가 원본과 같다. `verify -orig` 는 메모가 사라지면 위반을 낸다 |
 | 변경 추적 | **두 조건을 따로 본다.** (1) 원본에 있던 변경 추적이 하나도 사라지지 않았다: `verify -orig` 가 위반을 안 낸다. (2) 이번 편집이 새 변경 추적으로 남았다: `info` 의 변경 추적 수가 원본보다 늘었고, `text -view markup` 에서 고친 위치에 `[+ +]`·`[- -]` 가 보인다. 수가 원본과 같으면 편집이 추적되지 않은 것이다 |
 | 금지어·em dash | `-banned 금지어.txt` (내부 이름 목록을 넣는다). em dash 는 항상 위반 |
-| 열리나 (Windows) | `"$WH" convert -to pdf` 가 끝까지 되고, PDF 마지막 쪽에 원본 마지막 쪽 글이 있는지 |
-| 그림·모양 (Windows) | PDF 를 원본 PDF 와 나란히 보고 그림이 영역 안에 있는지, 표가 깨지거나 쪽이 밀리지 않았는지 |
+| 열리나 | `"$WH" convert -to pdf` 가 끝까지 되고, PDF 마지막 쪽에 원본 마지막 쪽 글이 있는지. 한글로 여는지까지 보려면 한글이 깔린 Windows 에서 `-engine hancom` 으로 한 번 더 |
+| 그림·모양 | PDF 를 원본 PDF 와 나란히 보고 그림이 영역 안에 있는지, 표가 깨지거나 쪽이 밀리지 않았는지. 두 PDF 는 같은 엔진으로 만든다 (글꼴 차이로 생기는 어긋남이 양쪽에 같이 나서 비교가 된다) |
 
 ### 공개·외부 제출본
 
@@ -113,10 +115,10 @@ hwpx 의 XML 을 손으로 고치지 않는다. `apply` 가 아래를 대신 한
 
 | 함정 | 어떻게 |
 |------|--------|
-| 한글 COM 이 `%TEMP%` 밖 경로에 저장할 때 파일 접근 허용 대화상자를 띄우고 멈춘다 | `convert` 가 임시 폴더 사본으로 작업해서 피한다. 한글 COM 을 직접 부르지 않는다 |
-| 끝나지 않은 `Hwp.exe` 가 파일을 잠근다 | 잠겼으면 알리고 다른 이름으로 저장한다. 이미 떠 있는 한글은 사용자 것일 수 있어 **끝내지 않는다**. `convert` 는 자기가 띄운 한글만 닫는다 |
+| 한글 COM 이 `%TEMP%` 밖 경로에 저장할 때 파일 접근 허용 대화상자를 띄우고 멈춘다 | `convert -engine hancom` 이 임시 폴더 사본으로 작업해서 피한다. 한글 COM 을 직접 부르지 않는다 |
+| 끝나지 않은 `Hwp.exe` 가 파일을 잠근다 | 잠겼으면 알리고 다른 이름으로 저장한다. 이미 떠 있는 한글은 사용자 것일 수 있어 **끝내지 않는다**. `convert -engine hancom` 은 자기가 띄운 한글만 닫는다 |
 | OneDrive 같은 동기화 폴더에 바로 저장하면 멈출 수 있다 | 임시 폴더에 저장한 뒤 복사하고, 두 파일의 md5 가 같은지 본다 (`md5sum 임시본 복사본`) |
-| `.hwp` 를 Go 로 직접 쓰는 기능은 없다 | 저장은 hwpx 로 하고, `.hwp` 가 필요하면 `convert -to hwp` |
+| `apply` 는 `.hwp` 로 저장하지 않는다 | 저장은 hwpx 로 하고, `.hwp` 가 필요하면 `convert -to hwp` |
 
 ## 7. docx 에서 글을 뽑을 때
 
