@@ -147,6 +147,11 @@ def main():
 
 
 if __name__ == "__main__":
+    # Windows 에서 출력이 파이프·파일로 가면 기본 인코딩(cp949)으로 나간다. 받는 쪽은 UTF-8 로 읽는다
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
     try:
         main()
     except Exception:
