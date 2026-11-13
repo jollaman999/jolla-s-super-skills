@@ -258,13 +258,15 @@ lang_cmd() { # <설치위치>
   printf 'P="%s/skills/shared/scripts/lang-guard.py"; [ -f "$P" ] && %s "$P"; exit 0' "$1" "$PY"
 }
 
+# 링크 검사 뒤에 자동 업데이트(self-update.sh)를 부른다. 원격 확인은 떼어서 띄우므로 기다리지 않는다.
 hook_cmd() { # <설치위치>
-  printf 'S="%s/skills/shared/scripts/check-install.sh"; if [ -x "$S" ]; then "$S" --quiet "%s" || true; else echo "skills 설치가 깨졌습니다: 검사 스크립트에 닿지 못합니다 (%s/skills/shared). repo 를 옮겼거나 지웠는지 보세요"; fi; exit 0' "$1" "$1" "$1"
+  printf 'S="%s/skills/shared/scripts/check-install.sh"; U="%s/skills/shared/scripts/self-update.sh"; if [ -x "$S" ]; then "$S" --quiet "%s" || true; if [ -x "$U" ]; then "$U" --quiet "%s" || true; fi; else echo "skills 설치가 깨졌습니다: 검사 스크립트에 닿지 못합니다 (%s/skills/shared). repo 를 옮겼거나 지웠는지 보세요"; fi; exit 0' "$1" "$1" "$1" "$1" "$1"
 }
 
 # JSON 을 손으로 자르지 않는다. settings.json 은 사용자 파일이고 남의 훅이 들어 있을 수 있다.
 # 쓸 도구가 없으면 2 를 내고 부르는 쪽이 안내만 한다. 조용히 틀리지 않는다.
 # 이벤트와 표식을 받는다. 표식은 명령 문자열 안에 든 낱말이고, 그 이벤트에서 표식이 든 항목만 내 것으로 본다.
+# add 는 내 항목을 걷어내고 새로 넣는다. 내 항목이 하나뿐이고 명령·제한 시간이 같으면 파일을 안 쓰고 10 을 낸다.
 hook_edit() { # <settings.json> <add|remove> <이벤트> <표식> [명령] [timeout초]
   if   [ -n "$PY" ]; then hook_edit_py "$@"
   elif [ -n "$PS" ]; then hook_edit_ps "$@"
@@ -290,6 +292,10 @@ if not isinstance(lst, list):
     sys.exit(3)
 def mine(e):
     return any(MARK in (h or {}).get("command", "") for h in (e or {}).get("hooks", []))
+if op == "add":
+    have = [e for e in lst if mine(e)]
+    if len(have) == 1 and [((h or {}).get("command"), (h or {}).get("timeout")) for h in (have[0] or {}).get("hooks", [])] == [(cmd, int(tmo))]:
+        sys.exit(10)                  # 이미 같다. 사용자 파일을 다시 쓰지 않는다
 lst = [e for e in lst if not mine(e)]              # 내가 넣은 것만 걷어낸다
 if op == "add":
     lst.append({"matcher": "",
@@ -331,6 +337,17 @@ if (-not (Has $cfg 'hooks')) { $cfg | Add-Member -NotePropertyName hooks -NotePr
 $hooks = $cfg.hooks
 $list = @()
 if ((Has $hooks $Event) -and $hooks.$Event) { $list = @($hooks.$Event) }
+
+if ($Op -eq 'add') {
+  $have = @($list | Where-Object { $_ -and (Has $_ 'hooks') -and (@($_.hooks) | Where-Object { $_ -and $_.command -and $_.command.Contains($MARK) }) })
+  if ($have.Count -eq 1) {
+    $hs = @($have[0].hooks)
+    if ($hs.Count -eq 1 -and $hs[0].command -ceq $Cmd -and [int]$hs[0].timeout -eq $Tmo) {
+      Remove-Item -LiteralPath $bak -Force -ErrorAction SilentlyContinue
+      exit 10
+    }
+  }
+}
 
 $kept = New-Object System.Collections.ArrayList
 foreach ($e in $list) {
@@ -396,6 +413,15 @@ PS1EOF
 
 # --- 해제 ---
 # 기록(manifest)이 있으면 거기 적힌 것만 지운다. 없으면 예전 방식대로 링크만 본다.
+# 자동 업데이트(self-update.sh)가 남긴 확인 시각·알림 기록·잠금·로그는 어느 쪽이든 지운다.
+remove_state() {
+  local f
+  for f in lastcheck notified lock fetch.log install.log; do
+    [ -e "$DEST/.jolla-skills.$f" ] || continue
+    say "  제거   .jolla-skills.$f"; run rm -f "$DEST/.jolla-skills.$f"
+  done
+}
+
 if [ "$UNINSTALL" -eq 1 ]; then
   say "해제: $REPO -> $DEST"
   if [ -f "$MANIFEST" ]; then
@@ -432,6 +458,7 @@ if [ "$UNINSTALL" -eq 1 ]; then
       elif hook_edit "$DEST/settings.json" remove PostToolUse lang-guard.py; then say "  제거   settings.json 의 PostToolUse 훅 (lang-guard)"
       else say "  건너뜀 settings.json 의 PostToolUse 훅 (lang-guard)  (고칠 도구가 없거나 읽을 수 없음). 직접 지우세요"; fi
     fi
+    remove_state
     run rm -f "$MANIFEST"
     # 비게 된 디렉터리만 정리한다. rmdir 은 비지 않은 것은 건드리지 않는다.
     for d in skills agents; do rmdir "$DEST/$d" 2>/dev/null; done
@@ -446,6 +473,7 @@ if [ "$UNINSTALL" -eq 1 ]; then
         say "  건너뜀 ${e##*:}   (이 repo 가 건 링크가 아님)"
       fi
     done
+    remove_state
   fi
   say
   say "각 repo 의 .git/hooks 에 설치한 훅은 그대로 남습니다."
@@ -524,8 +552,8 @@ if [ -z "$MODE" ] && [ "$DRY" -eq 0 ]; then
     else
       say "  2) 이 위치에 복사로 설치합니다"
     fi
-    say "     복사는 링크가 아니라서 git pull 해도 자동 반영되지 않습니다."
-    say "     갱신하려면 pull 한 뒤 이 스크립트를 다시 돌려야 합니다."
+    say "     복사는 링크가 아니라서 git pull 만으로는 반영되지 않습니다."
+    say "     세션 시작 훅을 걸면 repo 를 당긴 뒤 다시 복사하고, 안 걸면 pull 한 뒤 이 스크립트를 다시 돌려야 합니다."
     say
     printf '선택 [1/2] (기본 1): '
     a=""; read -r a || a=""
@@ -598,7 +626,7 @@ place_one(){ # <repo 상대경로> <설치 상대경로>
 
 say "설치: $REPO -> $DEST"
 say "  범위: $([ "$SCOPE" = project ] && echo "프로젝트 ($PROJDIR)" || echo "전역")"
-say "  방식: $([ "$MODE" = copy ] && echo "복사 (git pull 후 재실행 필요)" || echo "심볼릭 링크")"
+say "  방식: $([ "$MODE" = copy ] && echo "복사 (세션 시작 훅이 없으면 git pull 후 재실행 필요)" || echo "심볼릭 링크")"
 say
 
 for e in "${LINKS[@]}"; do place_one "${e%%:*}" "${e##*:}"; done
@@ -620,11 +648,17 @@ fi
 
 # --- 설치 기록 ---
 # --uninstall 이 무엇을 지울지 여기서만 정한다. 이름 규칙으로 추측하지 않는다.
+# commit= 은 복사 설치가 어느 커밋을 복사했는지다. self-update.sh 가 repo 와 비교해 다시 깔지 정한다.
+# autoupdate= 는 사용자가 손으로 넣는 줄이라 다시 설치해도 지킨다.
+AUTOUPDATE=$(sed -n 's/^autoupdate=//p' "$MANIFEST" 2>/dev/null | head -1)
+COMMIT=$(git -C "$REPO" rev-parse -q --verify HEAD 2>/dev/null)
 {
   echo "# jolla-s-super-skills 설치 기록. --uninstall 이 이 목록만 지운다."
   echo "mode=$MODE"
   echo "repo=$REPO"
   echo "scope=$SCOPE"
+  [ -n "$COMMIT" ] && echo "commit=$COMMIT"
+  [ -n "$AUTOUPDATE" ] && echo "autoupdate=$AUTOUPDATE"
   for p in "${PLACED[@]}"; do echo "path=$p"; done
 } > "$MANIFEST"
 
@@ -632,15 +666,30 @@ fi
 # 커밋 훅과 같은 관례다 - 묻지 않고 깔지 않는다.
 SET="$DEST/settings.json"
 if grep -q "check-install.sh" "$SET" 2>/dev/null; then
-  :                                       # 이미 걸려 있다. 다시 묻지 않는다
+  # 이미 걸려 있다. 다시 묻지 않는다. 기록은 위에서 새로 썼으므로 내 훅이라는 줄을 다시 적는다.
+  # 예전 설치가 넣은 명령이면 새 명령으로 갈아 끼운다. 다른 훅은 그대로 둔다.
+  echo "hook=SessionStart" >> "$MANIFEST"
+  hook_edit "$SET" add SessionStart check-install.sh "$(hook_cmd "$DEST")"
+  case $? in
+    0)  say
+        say "  SessionStart 훅을 새 명령으로 바꿨습니다: $SET"
+        say "  이제 링크 검사 뒤에 자동 업데이트(self-update.sh)도 부릅니다. 끄려면 $MANIFEST 에 autoupdate=off" ;;
+    10) : ;;
+    *)  say
+        say "  SessionStart 훅을 새 명령으로 바꾸지 못했습니다 (설정 파일을 읽을 수 없거나 도구가 없습니다)."
+        say "  hooks.SessionStart 의 check-install.sh 항목을 이 명령으로 바꾸세요:"
+        say "    $(hook_cmd "$DEST")" ;;
+  esac
 elif [ "$DRY" -eq 1 ]; then
   say
   say "  (dry-run) SessionStart 훅을 걸지 물었을 것입니다"
 else
   say
-  say "설치가 깨졌는지 세션 시작 때 알려주는 훅을 걸 수 있습니다."
-  say "  하는 일: 설치한 ${#PLACED[@]}개가 살아 있는지 본다. 0초, 네트워크 없음, 읽기만"
-  say "  깨졌을 때만 말하고 정상이면 아무 말도 안 합니다"
+  say "설치가 깨졌는지 알리고 skills 를 원격에 맞춰 두는 훅을 세션 시작 때 걸 수 있습니다."
+  say "  하는 일: 설치한 ${#PLACED[@]}개가 살아 있는지 본다 (읽기만)"
+  say "           6시간에 한 번 뒤에서 git fetch 하고, 받아 둔 origin/main 보다 뒤처졌으면"
+  say "           main 이고 커밋 안 한 변경·앞선 로컬 커밋이 없을 때만 git merge --ff-only 로 당긴다"
+  say "  깨졌거나 업데이트했거나 못 했을 때만 말합니다. 자동 업데이트만 끄려면 $MANIFEST 에 autoupdate=off"
   if [ -z "$PY" ] && [ -z "$PS" ]; then
     say
     say "  python 도 powershell 도 없어 $SET 을 안전하게 고칠 수 없습니다. 직접 넣으세요:"
@@ -670,7 +719,7 @@ fi
 # --- 언어 훅 (물어보고 넣는다) ---
 # 규칙 문서만으로는 짧은 진행 줄이 영어로 샌다. 새는 순간 같은 턴 안에서 되돌려 준다.
 if grep -q "lang-guard.py" "$SET" 2>/dev/null; then
-  :
+  echo "hook=PostToolUse" >> "$MANIFEST"  # 이미 걸려 있다. 새로 쓴 기록에 다시 적는다
 elif [ "$DRY" -eq 1 ]; then
   say
   say "  (dry-run) 언어 훅(PostToolUse)을 걸지 물었을 것입니다"
@@ -728,9 +777,12 @@ say
 if [ "$OK" -eq 1 ]; then
   if [ "$MODE" = link ]; then
     say "완료. 링크라서 이 repo 를 git pull 하면 바로 반영됩니다."
+    grep -qxF "hook=SessionStart" "$MANIFEST" && say "세션 시작 훅이 조건이 맞을 때 알아서 당깁니다."
+  elif grep -qxF "hook=SessionStart" "$MANIFEST"; then
+    say "완료. 복사본이지만 세션 시작 훅이 repo 를 당긴 뒤 다시 복사합니다."
   else
     say "완료. 복사본이라 자동 반영되지 않습니다."
-    say "갱신: cd $REPO && git pull && $0 --project $PROJDIR --copy"
+    say "갱신: cd $REPO && git pull && $0 $([ "$SCOPE" = project ] && echo "--project $PROJDIR" || echo "--global") --copy"
   fi
 else
   say "일부가 설치되지 않았습니다. 위 목록을 확인하세요."
