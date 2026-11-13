@@ -192,7 +192,7 @@ Git Bash 안에서는 `/c/Users/<이름>/.claude/...` 로 보입니다.
 | Git for Windows | 필수 | Bash 도구가 PowerShell 로 바뀌어 이 repo 의 스크립트가 하나도 실행되지 않습니다. |
 | 심볼릭 링크 | 개발자 모드 또는 관리자 권한 | 설치 스크립트가 켜는 법을 알려주고, 복사로 설치할지 물어봅니다. |
 | SSH 키 (`VH_KEY`) | 원격 검증을 쓸 때. Windows 의 기본 인증 방식입니다. | 비밀번호 방식으로 가야 하는데, 그건 `sshpass` 가 있어야 합니다. |
-| `sshpass` | 비밀번호 SSH 를 쓸 때만 | 해당 항목이 `unknown` 으로 나옵니다. **키를 쓰는 쪽이 정석입니다.** 깔 방법은 `install.sh --check` (cmd 면 `install.bat --check`) 가 알려줍니다. |
+| `sshpass` | 비밀번호 SSH 를 쓸 때만. `winget install -e --id xhcoding.sshpass-win32` 로 깔고, 이때 접속은 Windows OpenSSH(선택적 기능의 OpenSSH 클라이언트)로 나갑니다. | 해당 항목이 `unknown` 으로 나옵니다. **키를 쓰는 쪽이 정석입니다.** 상태는 `install.sh --check` (cmd 면 `install.bat --check`) 가 알려줍니다. |
 | `ip` (iproute2) | 쓰지 않습니다. Windows 에는 포트 자체가 없습니다. | 접속 실패 시 VPN egress 진단만 생략됩니다. |
 | Docker Desktop | 컨테이너 헬스 체크를 쓸 때만 | 그 항목만 건너뜁니다. |
 

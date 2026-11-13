@@ -15,25 +15,27 @@
 docker save <img>:<tag> | gzip > /tmp/img.tar.gz
 LOCAL=$(md5sum /tmp/img.tar.gz | cut -c1-32)
 
-# 전송
-timeout 300 sshpass -p "$PW" scp -o StrictHostKeyChecking=no /tmp/img.tar.gz root@"$H":/data/docker/
+# 전송. 비밀번호는 SSHPASS 로 넘긴다 (sshpass -p 는 ps 에 보인다)
+export SSHPASS="$PW"
+timeout 300 sshpass -e scp -o StrictHostKeyChecking=no /tmp/img.tar.gz root@"$H":/data/docker/
 
 # 전송 무결성 - 로드 전에 확인한다
-REMOTE=$(timeout 60 sshpass -p "$PW" ssh -n -o StrictHostKeyChecking=no root@"$H" "md5sum /data/docker/img.tar.gz | cut -c1-32")
+REMOTE=$(timeout 60 sshpass -e ssh -n -o StrictHostKeyChecking=no root@"$H" "md5sum /data/docker/img.tar.gz | cut -c1-32")
 [ "$LOCAL" = "$REMOTE" ] || { echo "전송 깨짐"; exit 1; }
 
 # 로드 + 재기동
-timeout 400 sshpass -p "$PW" ssh -n -o StrictHostKeyChecking=no root@"$H" \
+timeout 400 sshpass -e ssh -n -o StrictHostKeyChecking=no root@"$H" \
   "gunzip -c /data/docker/img.tar.gz | docker load && bash /data/scripts/run_<svc>.sh"
 ```
 
 ## 다중 호스트 - 한 대씩 (운영 권장)
 
 ```sh
+export SSHPASS="$PW"
 for h in 192.0.2.11 192.0.2.12; do
   echo "===== $h ====="
-  timeout 300 sshpass -p "$PW" scp -o StrictHostKeyChecking=no /tmp/img.tar.gz root@"$h":/data/docker/
-  timeout 400 sshpass -p "$PW" ssh -n -o StrictHostKeyChecking=no root@"$h" "…로드+재기동…"
+  timeout 300 sshpass -e scp -o StrictHostKeyChecking=no /tmp/img.tar.gz root@"$h":/data/docker/
+  timeout 400 sshpass -e ssh -n -o StrictHostKeyChecking=no root@"$h" "…로드+재기동…"
   scripts/deploy-wait.sh "$h" <svc> 120 || { echo "$h 실패 - 중단"; break; }
 done
 ```

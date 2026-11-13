@@ -85,7 +85,7 @@ runs() { # <명령> - 실제로 실행되는지
     awk)     printf 'x\n' | awk '{print}' >/dev/null 2>&1 ;;
     find)    find . -maxdepth 0 >/dev/null 2>&1 ;;
     ssh)     ssh -V >/dev/null 2>&1 ;;
-    sshpass) sshpass -V >/dev/null 2>&1 ;;
+    sshpass) case "$(sshpass -h 2>&1)" in *"Usage: sshpass"*) ;; *) return 1 ;; esac ;;  # winget 판 sshpass-win32 에는 -V 가 없다
     ip)      ip -V >/dev/null 2>&1 ;;
     *)       "$1" --version >/dev/null 2>&1 ;;
   esac
@@ -123,12 +123,18 @@ preflight() {
   usable ssh  && pf_ok "ssh   ($(command -v ssh))"  || pf_bad "ssh   - Windows 는 Git for Windows 설치 필요"
   usable curl && pf_ok "curl  ($(command -v curl))" || pf_bad "curl  - Windows 는 Git for Windows 또는 내장 curl 필요"
   if usable timeout || usable gtimeout; then pf_ok "timeout"; else pf_warn "timeout 없음 - 스크립트 내장 워치독으로 대신합니다"; fi
-  if usable sshpass; then pf_ok "sshpass (비밀번호 SSH 가능)"
+  if usable sshpass && is_windows && ! sshpass -V >/dev/null 2>&1; then
+    # sshpass-win32 는 Git Bash 의 ssh 와 물리지 않아 스크립트가 Windows OpenSSH 를 골라 쓴다
+    if [ -f /c/Windows/System32/OpenSSH/ssh.exe ]; then
+      pf_ok "sshpass (sshpass-win32, 비밀번호 SSH 는 Windows OpenSSH 로 접속)"
+    else
+      pf_warn "sshpass-win32 는 있지만 Windows OpenSSH(C:\\Windows\\System32\\OpenSSH\\ssh.exe)가 없습니다 - 설정 > 시스템 > 선택적 기능에서 OpenSSH 클라이언트를 켜세요"
+    fi
+  elif usable sshpass; then pf_ok "sshpass (비밀번호 SSH 가능)"
   elif is_windows; then
     pf_warn "sshpass 없음 - Windows 는 SSH 키(VH_KEY)가 기본입니다. 비밀번호가 꼭 필요하면:"
-    say "         MSYS2   pacman -S sshpass  (Git Bash 에는 pacman 이 없어 MSYS2 를 따로 깔아야 합니다)"
-    say "         Cygwin  setup-x86_64.exe 에서 sshpass 선택  (Cygwin 자체는 지원 셸이 아닙니다)"
-    say "         winget  winget install xhcoding.sshpass-win32  (Git Bash 의 ssh 와 물리는지는 검증되지 않았습니다)"
+    say "         winget install -e --id xhcoding.sshpass-win32"
+    say "         비밀번호 접속은 Git Bash 의 ssh 대신 Windows OpenSSH(선택적 기능의 OpenSSH 클라이언트)로 나갑니다"
   else pf_warn "sshpass 없음 - 비밀번호 SSH 를 못 씁니다. SSH 키(VH_KEY)를 쓰세요"; fi
   if usable ip; then pf_ok "ip (접속 실패 시 VPN egress 진단 가능)"
   else pf_warn "ip 없음 - 접속 실패 시 VPN egress 진단이 생략됩니다. Windows 에는 iproute2 포트가 없습니다"; fi

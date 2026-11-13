@@ -58,6 +58,41 @@ printf '%s' "$out" | grep -q '\[진단\]' && ok || bad "접속 불가인데 진�
 out=$(env VH_HOST=127.0.0.1 VH_PORT=1 VH_TO=6 "$S/ssh-run.sh" T 'echo x' 2>&1)
 printf '%s' "$out" | grep -q '진단' && bad "refused 인데 진단이 붙음" || ok
 
+echo "== 비밀번호 전달과 sshpass-win32 출력 정리"
+# sshpass·uname·cygpath 를 가짜로 세워 접속 없이 본다. 가짜 sshpass 는 받은 인자와 SSHPASS 를 적고
+# sshpass-win32 가 ConPTY 로 내는 모양(앞 빈 줄, ESC[?..., CR)을 흉내 낸 출력을 낸다.
+T=$(mktemp -d); mkdir -p "$T/bin" "$T/win/System32/OpenSSH"; : > "$T/win/System32/OpenSSH/ssh.exe"
+cat > "$T/bin/sshpass" <<STUB
+#!/usr/bin/env bash
+if [ "\$1" = -V ]; then
+  [ -n "\${STUB_REAL:-}" ] && { echo "sshpass 1.10"; exit 0; }
+  echo "error: unknown option \\\`-V\\\`"; exit 1
+fi
+printf '%s\n' "\$@" > "$T/args"; printf '%s|%s\n' "\${SSHPASS:-}" "\${MSYS2_ARG_CONV_EXCL:-}" > "$T/env"
+printf '\n\033[?25lremote-out\r\n\033[?9001l\033[?1004l'
+STUB
+printf '#!/bin/sh\necho "${STUB_OS:-MINGW64_NT-10.0}"\n' > "$T/bin/uname"
+printf '#!/bin/sh\ncase "$1" in -u) echo "%s/win" ;; -w) echo "W:\\\\ssh.exe" ;; esac\n' "$T" > "$T/bin/cygpath"
+chmod 755 "$T/bin/sshpass" "$T/bin/uname" "$T/bin/cygpath"
+FAKE=$(printf 'T3st&%s#2' 'Pw')
+ev() { sed -E 's/.*"evidence":("([^"\\]|\\.)*").*/\1/'; }
+out=$(env PATH="$T/bin:$PATH" VH_HOST=192.0.2.1 VH_PW="$FAKE" VH_TO=6 "$S/ssh-run.sh" T 'echo x' 2>&1)
+grep -qF "$FAKE" "$T/args" && bad "비밀번호가 sshpass 인자에 들어감" || ok
+[ "$(cat "$T/env")" = "$FAKE|*" ] && ok || bad "SSHPASS 나 경로 변환 끄기가 안 넘어감: $(sed "s/$FAKE/***/" "$T/env")"
+[ "$(head -2 "$T/args" | tr '\n' ' ')" = '-e W:\ssh.exe ' ] && ok || bad "sshpass-win32 인데 Windows OpenSSH 를 안 고름: $(head -2 "$T/args" | tr '\n' ' ')"
+grep -qx 'UserKnownHostsFile=NUL' "$T/args" && grep -qx 'PubkeyAuthentication=no' "$T/args" && ok || bad "NUL·PubkeyAuthentication=no 가 안 붙음"
+[ "$(printf '%s' "$out" | ev)" = '"remote-out"' ] && ok || bad "ConPTY 제어 문자·CR·빈 줄이 남음: $(printf '%s' "$out" | ev)"
+# Windows OpenSSH 가 없으면 PATH 의 ssh 를 쓰고 이유를 남긴다
+rm "$T/win/System32/OpenSSH/ssh.exe"
+out=$(env PATH="$T/bin:$PATH" VH_HOST=192.0.2.1 VH_PW="$FAKE" VH_TO=6 "$S/ssh-run.sh" T 'echo x' 2>&1)
+[ "$(head -2 "$T/args" | tr '\n' ' ')" = '-e ssh ' ] && printf '%s' "$out" | grep -q 'Windows OpenSSH.*없어' && ok || bad "Windows OpenSSH 없음 안내가 안 붙음"
+# 리눅스(원래 sshpass)는 출력을 건드리지 않는다
+out=$(env PATH="$T/bin:$PATH" STUB_OS=Linux STUB_REAL=1 VH_HOST=192.0.2.1 VH_PW="$FAKE" VH_TO=6 "$S/ssh-run.sh" T 'echo x' 2>&1)
+[ "$(printf '%s' "$out" | ev)" = '"\n[?25lremote-out\r\n[?9001l[?1004l"' ] && ok || bad "리눅스 출력이 바뀜: $(printf '%s' "$out" | ev)"
+grep -qx 'UserKnownHostsFile=/dev/null' "$T/args" && grep -qx 'PubkeyAuthentication=no' "$T/args" && ok || bad "리눅스 비밀번호 접속 옵션이 다름"
+rm "$T/args" "$T/env" "$T/bin/sshpass" "$T/bin/uname" "$T/bin/cygpath"
+rmdir "$T/bin" "$T/win/System32/OpenSSH" "$T/win/System32" "$T/win" "$T"
+
 echo "== session-guard 슬러그"
 # Claude Code 는 경로의 영숫자가 아닌 글자를 한 글자당 '-' 하나로 바꿔 세션 기록 폴더를 만든다.
 # '/' 만 바꾸면 '.' '_' 한글이 든 경로에서 기록을 못 찾아 exit 2 가 난다.

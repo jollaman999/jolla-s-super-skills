@@ -6,7 +6,7 @@
 #   VH_HOST   (필수) 대상 호스트
 #   VH_USER   기본 root
 #   VH_PORT   기본 22
-#   VH_PW     비밀번호 (sshpass 사용). 미설정이면 키 방식
+#   VH_PW     비밀번호 (sshpass -e 로 환경 변수 SSHPASS 에 실어 넘긴다. 명령 줄에 안 나온다). 미설정이면 키 방식
 #   VH_KEY    SSH 키 경로
 #   VH_JUMP   점프 호스트 "user@host:port" - 설정 시 2단 접속
 #   VH_JUMPPW 점프 호스트 비밀번호
@@ -27,6 +27,33 @@ HOST="${VH_HOST:?VH_HOST required}"; USER_="${VH_USER:-root}"
 PORT="${VH_PORT:-22}"; TO="${VH_TO:-60}"
 
 have() { command -v "$1" >/dev/null 2>&1; }
+
+# Windows(Git Bash) 의 winget 판 sshpass-win32 는 ConPTY 로 ssh 를 띄운다.
+# Git Bash 의 ssh(MSYS)와는 비밀번호 프롬프트를 못 잡아 제한 시간까지 멈추고, Windows OpenSSH 와는 붙는다 (2026-11-13 실측).
+# 가르는 기준은 -V 다. 원래 sshpass(MSYS2·Cygwin 빌드 포함)는 "sshpass 1.x" 를 내고 sshpass-win32 는 -V 를 모른다.
+SSH_BIN=ssh; KH=/dev/null; PTY=""; NOCONV=""; PTY_NOTE=""
+if [ -n "${VH_PW:-}${VH_JUMPPW:-}" ] && have sshpass; then
+  case "$(uname -s 2>/dev/null)" in
+    MINGW*|MSYS*)
+      case "$(sshpass -V 2>/dev/null)" in
+        "sshpass "*) ;;
+        *) PTY=1
+           WINSSH="$(cygpath -u "${SYSTEMROOT:-C:\\Windows}" 2>/dev/null || echo /c/Windows)/System32/OpenSSH/ssh.exe"
+           if [ -f "$WINSSH" ]; then
+             # 경로 변환을 끄고 Windows 형식으로 넘긴다. 켜 두면 / 로 시작하는 원격 명령까지 C:/Program Files/Git/... 로 바뀐다
+             SSH_BIN=$(cygpath -w "$WINSSH"); KH=NUL; NOCONV=1
+           else
+             PTY_NOTE="[주의] sshpass-win32 는 Git Bash 의 ssh 와 물리지 않아 제한 시간까지 멈춥니다. Windows OpenSSH($WINSSH)가 없어 PATH 의 ssh 를 썼습니다 -> 설정 > 시스템 > 선택적 기능에서 OpenSSH 클라이언트를 켜거나 SSH 키(VH_KEY)를 쓰세요"
+           fi ;;
+      esac ;;
+  esac
+fi
+
+# ConPTY 가 붙이는 제어 문자(ESC[?9001l 같은 CSI, ESC] 제목)와 CR, 앞쪽 빈 줄을 걷는다. sshpass-win32 일 때만 쓴다
+pty_clean() {
+  local e b; e=$(printf '\033'); b=$(printf '\007')
+  sed -e "s|${e}\[[0-9;?]*[ -/]*[@-~]||g" -e "s|${e}\][^${b}]*${b}||g" -e "s|${e}[=>]||g" | tr -d '\r' | awk 'NF{s=1} s'
+}
 
 mask() { sed -E \
   -e "s/(-p|--password)[= ]+[^ ]+/\1 ***/g" \
@@ -79,7 +106,7 @@ if ! have ssh; then
 elif ! have awk; then
   PRE="awk 가 없습니다"
 elif [ -n "${VH_PW:-}${VH_JUMPPW:-}" ] && ! have sshpass; then
-  PRE="비밀번호 인증에는 sshpass 가 필요한데 없습니다. Git Bash 에는 기본 포함되지 않습니다 -> SSH 키(VH_KEY)를 쓰거나 WSL 에서 실행하세요"
+  PRE="비밀번호 인증에는 sshpass 가 필요한데 없습니다. Git Bash 에는 기본 포함되지 않습니다 -> SSH 키(VH_KEY)를 쓰거나 winget install -e --id xhcoding.sshpass-win32 로 까세요"
 fi
 if [ -n "$PRE" ]; then
   RC=127; DESC="preflight"; VIA="direct"
@@ -88,7 +115,16 @@ if [ -n "$PRE" ]; then
 fi
 
 # -n: ssh 가 stdin 을 먹어 호출한 스크립트/루프를 삼키는 것을 막는다 (필수)
-OPTS=(-n -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=10)
+OPTS=(-n -o StrictHostKeyChecking=no -o "UserKnownHostsFile=$KH" -o LogLevel=ERROR -o ConnectTimeout=10)
+# 비밀번호 접속에서 에이전트·기본 키를 먼저 내밀면 MaxAuthTries 에 걸려 "Too many authentication failures" 로 끊긴다
+PWOPTS=(-o PubkeyAuthentication=no -o "PreferredAuthentications=password,keyboard-interactive")
+
+pw_ssh() { # <비밀번호> <ssh 인자...>  비밀번호는 환경 변수로만 넘긴다 (-p 는 ps 에 보인다)
+  local pw="$1"; shift
+  ( export SSHPASS="$pw"
+    [ -n "$NOCONV" ] && export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
+    run_to "$TO" sshpass -e "$SSH_BIN" "${OPTS[@]}" "${PWOPTS[@]}" "$@" )
+}
 
 build_inner() {  # 점프 호스트 뒤쪽
   if [ -n "${VH_JUMP:-}" ]; then
@@ -109,18 +145,20 @@ attempt() {  # 추가 ssh 옵션을 인자로 받아 한 번 실행한다. OUT/R
   if [ -n "${VH_JUMP:-}" ]; then
     local INNER; INNER=$(build_inner)
     if [ -n "${VH_JUMPPW:-}" ]; then
-      OUT=$(run_to "$TO" sshpass -p "$VH_JUMPPW" ssh "${OPTS[@]}" ${extra[@]+"${extra[@]}"} -p "$jp" "$ju@$jh" "$INNER" 2>&1); RC=$?
+      OUT=$(pw_ssh "$VH_JUMPPW" ${extra[@]+"${extra[@]}"} -p "$jp" "$ju@$jh" "$INNER" 2>&1); RC=$?
     else
       OUT=$(run_to "$TO" ssh "${OPTS[@]}" ${extra[@]+"${extra[@]}"} -p "$jp" "$ju@$jh" "$INNER" 2>&1); RC=$?
     fi
     DESC="via $ju@$jh:$jp -> $USER_@$HOST:$PORT"
   elif [ -n "${VH_PW:-}" ]; then
-    OUT=$(run_to "$TO" sshpass -p "$VH_PW" ssh "${OPTS[@]}" ${extra[@]+"${extra[@]}"} -p "$PORT" "$USER_@$HOST" "$RCMD" 2>&1); RC=$?
+    OUT=$(pw_ssh "$VH_PW" ${extra[@]+"${extra[@]}"} -p "$PORT" "$USER_@$HOST" "$RCMD" 2>&1); RC=$?
     DESC="$USER_@$HOST:$PORT (pw)"
   else
     OUT=$(run_to "$TO" ssh "${OPTS[@]}" ${extra[@]+"${extra[@]}"} ${VH_KEY:+-i "$VH_KEY"} -p "$PORT" "$USER_@$HOST" "$RCMD" 2>&1); RC=$?
     DESC="$USER_@$HOST:$PORT (key)"
   fi
+  [ -n "$PTY" ] && OUT=$(printf '%s' "$OUT" | pty_clean)
+  return 0
 }
 
 # 소스 IP 를 바꿔서 다시 해볼 값이 있는 실패인가.
@@ -267,6 +305,7 @@ if connect_class; then
   OUT=$(append_line "$OUT" "$DIAG")
 fi
 [ -n "$BYPASS_NOTE" ] && OUT=$(append_line "$OUT" "$BYPASS_NOTE")
+[ -n "$PTY_NOTE" ] && OUT=$(append_line "$OUT" "$PTY_NOTE")
 
 SAFE_OUT=$(printf '%s' "$OUT" | head -c 4000 | mask)
 SAFE_CMD=$(printf '%s' "$RCMD" | mask)
