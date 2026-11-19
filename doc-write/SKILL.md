@@ -14,7 +14,7 @@ description: 문서가 산출물인 일을 맡는다. 받은 자료를 전부 �
 | 참고 | 무엇 |
 |------|------|
 | [`references/questions.md`](references/questions.md) | 분석 방법(담당 표기, 협업 기관, 최신 분담 근거, 파일명 규칙)과 처음 질문 |
-| [`references/writing.md`](references/writing.md) | 쓰기 규칙과 근거 발화 |
+| [`references/writing.md`](references/writing.md) | 쓰기 규칙과 근거(실제로 있었던 실패) |
 | [`references/figures.md`](references/figures.md) | 그림 원칙, 스타일 사양, 출력별 넣는 법, 검사 |
 | [`references/hwp.md`](references/hwp.md) | why-hwp 로 hwp/hwpx 를 읽고 고치는 순서와 함정 |
 | [`references/formats-submit.md`](references/formats-submit.md) | 제출 양식: 정부과제 보고서·사업계획서·요구사항·제안서·SW 등록 명세서 |

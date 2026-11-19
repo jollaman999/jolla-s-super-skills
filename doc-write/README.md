@@ -6,13 +6,13 @@
 
 다른 skill 은 코드와 노드를 다룹니다. 문서는 그 밖이었고, 문서에서 나온 교정은 늘 같은 종류였습니다.
 
-| 교정 | 실제로 들은 말 |
+| 교정 | 실제로 있었던 일 |
 |------|----------------|
-| 독자를 안 정하고 씀 | "코드 적으로 말고 이거 발표 자료로 쓸거야 남들이 볼때 이해할수 있게" |
-| 양식·예시를 무시함 | "예시가 있는데 스타일을 왜 다 무시하고" |
-| 남의 몫을 우리 몫처럼 씀 | "왜 자꾸 니는 우리쪽으로 몰을려그래" |
-| 못 읽은 자료를 추정으로 채움 | "모둘별로 뭐할지 계획한 파일들 준것들에 대한 내용은 어따 팔아먹었냐" |
-| 산출물을 잃음 | "이거 내용을 다 지워 버렸네" |
+| 독자를 안 정하고 씀 | 발표 자료를 코드 설명으로 써서 다시 썼다 |
+| 양식·예시를 무시함 | 예시가 있는데 구성과 스타일을 따르지 않았다 |
+| 남의 몫을 우리 몫처럼 씀 | 협업 기관 몫을 우리 쪽 일로 적었다 |
+| 못 읽은 자료를 추정으로 채움 | 받은 계획 파일들의 내용을 문서에서 빠뜨렸다 |
+| 산출물을 잃음 | 커밋 안 한 리뷰 문서가 사라졌다 |
 
 ## 전제
 
@@ -76,7 +76,7 @@ WHY_HWP_VERSION=v0.3.0 bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh 
 | 파일 | 무엇 |
 |------|------|
 | [`references/questions.md`](references/questions.md) | 분석 방법과 처음 질문 |
-| [`references/writing.md`](references/writing.md) | 쓰기 규칙과 근거 발화 |
+| [`references/writing.md`](references/writing.md) | 쓰기 규칙과 근거(실제로 있었던 실패) |
 | [`references/figures.md`](references/figures.md) | 그림 원칙, 스타일, 넣는 법, 검사 |
 | [`references/hwp.md`](references/hwp.md) | hwp/hwpx 작업 순서와 함정 |
 | [`references/formats-submit.md`](references/formats-submit.md) | 정부과제 보고서·사업계획서·요구사항·제안서·SW 등록 명세서 |

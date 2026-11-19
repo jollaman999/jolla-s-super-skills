@@ -57,7 +57,7 @@ DOWNSTREAM_ROOTS=~/git/terraform ~/.claude/skills/shared/scripts/downstream-scan
 **보고만 한다.** 연동 repo 는 지시받은 범위 밖이다. 거기서 무엇이 실행 중인지, 지금 고쳐도 되는 시점인지는
 내가 모른다. 먼저 고쳐 놓고 알리는 것과 알리고 지시를 받는 것은 다르다.
 
-예외는 사용자가 그 repo 를 함께 지목했을 때뿐이다 (`"collector 고치고 stackctl 반영해봐"`).
+예외는 사용자가 그 repo 를 함께 지목했을 때뿐이다 (`"<repo> 고치고 <연동 repo> 도 반영해줘"`).
 
 ## 기록 형식 - `<repo>/.claude/downstream.md`
 
