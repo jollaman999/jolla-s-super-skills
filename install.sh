@@ -5,7 +5,7 @@
 #   전역     : ~/.claude       - 모든 프로젝트에 적용된다
 #   프로젝트 : <dir>/.claude   - 그 프로젝트에서만 적용된다
 #
-# usage: install.sh [--global | --project <dir>] [--copy] [--force] [--dry-run] [--uninstall] [--check] [--yes]
+# usage: install.sh [--global | --project <dir>] [--copy] [--force] [--dry-run] [--uninstall] [--check] [--yes] [--hook <이름>]
 #   --global      : 전역 설치. CLAUDE_CONFIG_DIR 가 있으면 그쪽을 쓴다
 #   --project DIR : 그 프로젝트 안에만 설치한다 (DIR/.claude)
 #   --copy        : 심볼릭 링크 대신 복사한다. 링크를 못 만드는 환경용
@@ -13,7 +13,8 @@
 #   --check       : 환경과 설치 상태를 보고 끝낸다. 아무것도 안 바꾼다
 #   --dry-run     : 무엇을 할지만 출력하고 아무것도 안 바꾼다
 #   --uninstall   : 이 스크립트가 설치한 것만 지운다 (남의 파일은 안 건드린다)
-#   --yes         : 물어보지 않고 기본값(전역·링크)으로 진행한다
+#   --yes         : 물어보지 않고 기본값(전역·링크)으로 진행한다. 묻는 훅은 건너뛴다
+#   --hook NAME   : 그 훅(lang-guard, until-guard)은 묻지 않고 건다. 여러 번 줄 수 있다. --yes 와 같이 쓴다
 #
 # 범위를 안 주고 터미널에서 실행하면 물어본다. 파이프나 CI 에서는 전역으로 간다.
 #
@@ -37,7 +38,7 @@ PS=""
 done
 
 SCOPE=""; PROJDIR=""; MODE=""
-FORCE=0; DRY=0; UNINSTALL=0; YES=0; CHECK=0
+FORCE=0; DRY=0; UNINSTALL=0; YES=0; CHECK=0; HOOKS=" "
 
 usage() {
   sed -n '3,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
@@ -54,6 +55,7 @@ while [ $# -gt 0 ]; do
     --uninstall)  UNINSTALL=1 ;;
     --check)      CHECK=1 ;;
     --yes|-y)     YES=1 ;;
+    --hook)       shift; case "${1:-}" in lang-guard|until-guard) HOOKS="$HOOKS$1 " ;; *) echo "모르는 훅: ${1:-} (lang-guard, until-guard)" >&2; exit 2 ;; esac ;;
     -h|--help)    usage; exit 0 ;;
     *) echo "모르는 인자: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -263,6 +265,10 @@ MANIFEST="$DEST/$MANIFEST_NAME"
 lang_cmd() { # <설치위치>
   printf 'P="%s/skills/shared/scripts/lang-guard.py"; [ -f "$P" ] && %s "$P"; exit 0' "$1" "$PY"
 }
+# 횟수 상한 없는 대기 루프(until, sleep 이 든 while)를 실행 전에 막는다 (until-guard.py). Bash 에만 건다.
+guard_cmd() { # <설치위치>
+  printf 'P="%s/skills/shared/scripts/until-guard.py"; [ -f "$P" ] && %s "$P"; exit 0' "$1" "$PY"
+}
 
 # 링크 검사 뒤에 자동 업데이트(self-update.sh)를 부른다. 원격 확인은 떼어서 띄우므로 기다리지 않는다.
 # 검사 스크립트에 못 닿을 때의 알림은 settings.json 에 박히므로 python 없이 셸만으로 훅 JSON 을 낸다.
@@ -280,16 +286,16 @@ hook_cmd() { # <설치위치>
 # 쓸 도구가 없으면 2 를 내고 부르는 쪽이 안내만 한다. 조용히 틀리지 않는다.
 # 이벤트와 표식을 받는다. 표식은 명령 문자열 안에 든 낱말이고, 그 이벤트에서 표식이 든 항목만 내 것으로 본다.
 # add 는 내 항목을 걷어내고 새로 넣는다. 내 항목이 하나뿐이고 명령·제한 시간이 같으면 파일을 안 쓰고 10 을 낸다.
-hook_edit() { # <settings.json> <add|remove> <이벤트> <표식> [명령] [timeout초]
+hook_edit() { # <settings.json> <add|remove> <이벤트> <표식> [명령] [timeout초] [matcher]
   if   [ -n "$PY" ]; then hook_edit_py "$@"
   elif [ -n "$PS" ]; then hook_edit_ps "$@"
   else return 2; fi
 }
 
-hook_edit_py() { # <settings.json> <add|remove> <이벤트> <표식> [명령] [timeout초]
-  "$PY" - "$1" "$2" "$3" "$4" "${5:-}" "${6:-5}" <<'PYJSON'
+hook_edit_py() { # <settings.json> <add|remove> <이벤트> <표식> [명령] [timeout초] [matcher]
+  "$PY" - "$1" "$2" "$3" "$4" "${5:-}" "${6:-5}" "${7:-}" <<'PYJSON'
 import json, os, sys
-path, op, EVENT, MARK, cmd, tmo = sys.argv[1:7]
+path, op, EVENT, MARK, cmd, tmo, matcher = sys.argv[1:8]
 try:
     with open(path, encoding="utf-8") as f:
         cfg = json.load(f)
@@ -307,11 +313,11 @@ def mine(e):
     return any(MARK in (h or {}).get("command", "") for h in (e or {}).get("hooks", []))
 if op == "add":
     have = [e for e in lst if mine(e)]
-    if len(have) == 1 and [((h or {}).get("command"), (h or {}).get("timeout")) for h in (have[0] or {}).get("hooks", [])] == [(cmd, int(tmo))]:
+    if len(have) == 1 and (have[0] or {}).get("matcher", "") == matcher and [((h or {}).get("command"), (h or {}).get("timeout")) for h in (have[0] or {}).get("hooks", [])] == [(cmd, int(tmo))]:
         sys.exit(10)                  # 이미 같다. 사용자 파일을 다시 쓰지 않는다
 lst = [e for e in lst if not mine(e)]              # 내가 넣은 것만 걷어낸다
 if op == "add":
-    lst.append({"matcher": "",
+    lst.append({"matcher": matcher,
                 "hooks": [{"type": "command", "command": cmd, "timeout": int(tmo)}]})
 if lst:
     hooks[EVENT] = lst
@@ -470,6 +476,11 @@ if [ "$UNINSTALL" -eq 1 ]; then
       if [ "$DRY" -eq 1 ]; then say "  제거   settings.json 의 PostToolUse 훅 (lang-guard)"
       elif hook_edit "$DEST/settings.json" remove PostToolUse lang-guard.py; then say "  제거   settings.json 의 PostToolUse 훅 (lang-guard)"
       else say "  건너뜀 settings.json 의 PostToolUse 훅 (lang-guard)  (고칠 도구가 없거나 읽을 수 없음). 직접 지우세요"; fi
+    fi
+    if grep -qxF "hook=PreToolUse" "$MANIFEST" 2>/dev/null; then
+      if [ "$DRY" -eq 1 ]; then say "  제거   settings.json 의 PreToolUse 훅 (until-guard)"
+      elif hook_edit "$DEST/settings.json" remove PreToolUse until-guard.py; then say "  제거   settings.json 의 PreToolUse 훅 (until-guard)"
+      else say "  건너뜀 settings.json 의 PreToolUse 훅 (until-guard)  (고칠 도구가 없거나 읽을 수 없음). 직접 지우세요"; fi
     fi
     remove_state
     run rm -f "$MANIFEST"
@@ -739,6 +750,11 @@ elif [ "$DRY" -eq 1 ]; then
 elif [ -z "$PY" ]; then
   say
   say "  python 이 없어 언어 훅(lang-guard)은 걸지 않습니다."
+elif [[ "$HOOKS" == *" lang-guard "* ]]; then
+  say
+  if hook_edit "$SET" add PostToolUse lang-guard.py "$(lang_cmd "$DEST")" 5; then
+    echo "hook=PostToolUse" >> "$MANIFEST"; say "  --hook lang-guard: 언어 훅을 넣었습니다: $SET"
+  else say "  --hook lang-guard: 넣지 못했습니다 (설정 파일을 읽을 수 없거나 도구가 없습니다)."; fi
 else
   say
   say "답하는 언어가 사용자 언어와 어긋나면 바로 알려주는 훅을 걸 수 있습니다."
@@ -755,6 +771,46 @@ else
       [Nn]*) say "  넣지 않았습니다." ;;
       *)     if hook_edit "$SET" add PostToolUse lang-guard.py "$(lang_cmd "$DEST")" 5; then
                echo "hook=PostToolUse" >> "$MANIFEST"
+               say "  넣었습니다: $SET"
+             else
+               say "  넣지 못했습니다 (설정 파일을 읽을 수 없거나 도구가 없습니다). 그대로 두었습니다."
+             fi ;;
+    esac
+  fi
+fi
+
+# --- 대기 루프 훅 (물어보고 넣는다) ---
+# "until 폴링에는 횟수 상한" 은 규칙 문서에 있는데도 상한 없는 루프가 계속 나갔다. 실행 전에 막는다.
+# Bash 도구에만 건다(matcher). 다른 도구를 부를 때는 python 을 띄우지 않는다.
+if grep -q "until-guard.py" "$SET" 2>/dev/null; then
+  echo "hook=PreToolUse" >> "$MANIFEST"  # 이미 걸려 있다. 새로 쓴 기록에 다시 적는다
+elif [ "$DRY" -eq 1 ]; then
+  say
+  say "  (dry-run) 대기 루프 훅(PreToolUse)을 걸지 물었을 것입니다"
+elif [ -z "$PY" ]; then
+  say
+  say "  python 이 없어 대기 루프 훅(until-guard)은 걸지 않습니다."
+elif [[ "$HOOKS" == *" until-guard "* ]]; then
+  say
+  if hook_edit "$SET" add PreToolUse until-guard.py "$(guard_cmd "$DEST")" 5 Bash; then
+    echo "hook=PreToolUse" >> "$MANIFEST"; say "  --hook until-guard: 대기 루프 훅을 넣었습니다: $SET"
+  else say "  --hook until-guard: 넣지 못했습니다 (설정 파일을 읽을 수 없거나 도구가 없습니다)."; fi
+else
+  say
+  say "횟수 상한 없는 대기 루프를 실행 전에 막는 훅을 걸 수 있습니다."
+  say "  하는 일: Bash 명령에 상한 없는 until 루프나 sleep 이 든 while 루프가 있으면 실행하지 않고 상한 거는 법을 모델에게 돌려준다"
+  say "  명령 글자만 보고, 네트워크 없음. 걸리지 않으면 아무 말도 안 합니다"
+  if ! ask; then
+    say
+    if [ "$YES" -eq 1 ]; then say "  --yes 라 묻지 않고 건너뛰었습니다. 걸려면 --hook until-guard 를 같이 주세요."
+    else                      say "  터미널이 아니라 물어볼 수 없어 건너뛰었습니다."; fi
+  else
+    a=y
+    printf '%s' "  $SET 에 넣을까요? [Y/n]: "; read -r a || a=""
+    case "${a:-y}" in
+      [Nn]*) say "  넣지 않았습니다." ;;
+      *)     if hook_edit "$SET" add PreToolUse until-guard.py "$(guard_cmd "$DEST")" 5 Bash; then
+               echo "hook=PreToolUse" >> "$MANIFEST"
                say "  넣었습니다: $SET"
              else
                say "  넣지 못했습니다 (설정 파일을 읽을 수 없거나 도구가 없습니다). 그대로 두었습니다."
