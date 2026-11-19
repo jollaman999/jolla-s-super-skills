@@ -1,6 +1,6 @@
 ---
 name: session-restore
-description: 이 PC 를 재부팅하기 전에 도는 Claude Code 세션들(tmux 안과 그냥 터미널 둘 다)을 적어 두고, 재부팅 뒤 tmux 세션으로 같은 디렉터리에서 --resume 으로 다시 연다. 저장도 복원도 할지 먼저 묻는다. TRIGGER - 이 PC 의 재부팅·전원 끄기를 실행하려 할 때(reboot, poweroff, shutdown, systemctl reboot), "세션 저장해 둬", "다시 띄워", "세션 다시 열어", "tmux 세션 복원". SKIP - 원격 호스트 재부팅(그 호스트의 세션은 여기서 안 보인다), Windows.
+description: 이 PC 를 재부팅하기 전에 도는 Claude Code 세션들(tmux 안과 그냥 터미널 둘 다)을 적어 두고, 재부팅 뒤 tmux 세션으로 같은 디렉터리에서 --resume 으로 다시 연다. 저장도 복원도 할지 먼저 묻는다. TRIGGER - 이 PC 의 재부팅·전원 끄기를 실행하려 할 때(reboot, poweroff, shutdown, systemctl reboot), "세션 저장해 둬", "다시 띄워", "세션 다시 열어", "tmux 세션 복원". SKIP - 원격 호스트 재부팅(그 호스트의 세션은 여기서 안 보인다), Windows·macOS (/proc 를 읽어서 Linux 에서만 돈다).
 ---
 
 # session-restore
