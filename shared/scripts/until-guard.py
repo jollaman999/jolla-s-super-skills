@@ -13,6 +13,8 @@
 #   조건 안의 timeout (until timeout 20 ssh ...; do) 은 한 번 시도의 상한이지 루프의 상한이 아니다.
 #   2026-11-12 에 남은 루프가 바로 이 모양이었다.
 # 찾는 곳: 명령 전체. bash -c, eval, ssh 로 넘기는 따옴표 안도 본다 (남은 루프가 eval '...' 안이었다).
+#   따옴표 안은 그 문자열을 셸이 실행할 때만 본다 - 바로 앞이 bash|sh|zsh -c, eval, ssh 일 때다.
+#   변수에 담거나 echo 로 찍는 문자열은 실행되지 않으니 막지 않는다 (CMD='... until ...' 를 막은 오탐이 있었다).
 #   heredoc 본문은 셸이 받는 것(bash/sh/zsh/ssh <<)만 보고, 파이썬 코드나 파일로 쓰는 본문은 뺀다. 주석도 뺀다.
 #
 # 입력: 훅 JSON (stdin). tool_name, tool_input.command 를 쓴다.
@@ -33,6 +35,12 @@ WORD = re.compile(r"\b(do|done)\b")
 CMP = re.compile(r"-(?:lt|le|gt|ge)\b|\(\([^()]*[<>][^()]*\)\)")
 OUTER = re.compile(r"\btimeout[ \t]+(?:-\S+[ \t]+)*\d+[smhd]?[ \t]+(?:\S+=\S*[ \t]+)*" + SHELLS + r"\b")
 TIMEOUT_WORD = re.compile(r"\btimeout[ \t]+(?:-\S+[ \t]+)*\d")
+# 따옴표 문자열을 셸이 실행하는 자리: 여는 따옴표 바로 앞이 이 모양이면 그 안은 명령이다
+LAUNCHER = re.compile(
+    r"(?:\b(?:bash|sh|zsh|dash|ksh)[ \t]+(?:-[A-Za-z]+[ \t]+)*-[A-Za-z]*c[ \t]*"
+    r"|\beval[ \t]*"
+    r"|\b(?:ssh|su|watch)\b[^;&|\n'\"]*)$"
+)
 
 
 def strip_heredocs(text):
@@ -93,6 +101,41 @@ def strip_comments(text):
     return "".join(out)
 
 
+def quote_spans(text):
+    """맨 바깥 따옴표 문자열의 (여는 위치, 닫는 위치) 목록."""
+    spans = []
+    q = None
+    start = 0
+    i = 0
+    n = len(text)
+    while i < n:
+        c = text[i]
+        if q is None:
+            if c == "\\":
+                i += 2
+                continue
+            if c in "'\"":
+                q, start = c, i
+        elif q == '"' and c == "\\":
+            i += 2
+            continue
+        elif c == q:
+            spans.append((start, i))
+            q = None
+        i += 1
+    if q is not None:
+        spans.append((start, n))
+    return spans
+
+
+def runs_as_shell(text, pos, spans):
+    """pos 가 따옴표 밖이거나, 셸이 실행하는 따옴표 문자열 안이면 True."""
+    for s, e in spans:
+        if s < pos < e:
+            return bool(LAUNCHER.search(text[max(0, s - 200):s]))
+    return True
+
+
 def loop_end(text, start):
     """start 바로 뒤의 do 와 짝이 맞는 done 의 끝 위치. 못 찾으면 글 끝."""
     depth = 1
@@ -131,8 +174,11 @@ def wrapped_by_timeout(text, loop_start):
 def uncapped_loops(command):
     text = strip_comments(strip_heredocs(command.replace("\r\n", "\n")))
     found = []
+    spans = quote_spans(text)
     for m in LOOP.finditer(text):
         kw, cond = m.group(1), m.group(2)
+        if not runs_as_shell(text, m.start(1), spans):
+            continue
         end = loop_end(text, m.end())
         region = text[m.start():end]
         if kw == "while":

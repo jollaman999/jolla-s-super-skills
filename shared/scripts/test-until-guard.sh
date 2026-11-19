@@ -64,6 +64,10 @@ until systemctl is-active --quiet app; do sleep 3; done
 EOF
 CMD
 
+chk deny "(문법 변형) timeout 없는 ssh 원격 명령 안" <<'CMD'
+ssh -n deploy@host.invalid 'until systemctl is-active --quiet app; do sleep 3; done'
+CMD
+
 echo "== 통과시켜야 하는 것"
 chk allow "카운터와 break" <<'CMD'
 cd /tmp/w/t28; n=0; until [ -e done-fin.txt ]; do n=$((n+1)); [ $n -ge 16 ] && break; sleep 10; done; ls | grep -c fin
@@ -98,6 +102,12 @@ chk allow "(문법 변형) timeout bash 에 넘긴 heredoc" <<'CMD'
 timeout 300 bash <<'EOF'
 until [ -f /tmp/w/ready ]; do sleep 2; done
 EOF
+CMD
+chk allow "변수에 담기만 한 문자열은 실행이 아니다" <<'CMD'
+CMDLINE='(sleep 15; echo READY > flag) & until [ -f flag ]; do sleep 1; done; cat flag'; printf '%s\n' "$CMDLINE" > /tmp/w/prompt.txt
+CMD
+chk allow "(문법 변형) echo 로 찍는 문자열" <<'CMD'
+echo "예: until [ -f done ]; do sleep 1; done 처럼 쓰지 말 것"
 CMD
 chk allow "Bash 가 아닌 도구는 안 본다" Monitor <<'CMD'
 until grep -q DONE /tmp/w/log; do sleep 5; done
