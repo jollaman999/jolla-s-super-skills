@@ -12,6 +12,7 @@ tools: Bash, Read, Grep, Glob
    이와 함께 전역 목록 `$CLAUDE_CONFIG_DIR/hosts.md` (`CLAUDE_CONFIG_DIR` 가 없으면 `~/.claude/hosts.md`)가 있으면 읽어서 이 repo 에 해당하는 행을 올린다. 쓰는 프로젝트 칸에 이 repo 가 있거나, repo 안에서 찾은 호스트와 주소가 같은 행이다. 1번에서 끝나는 경우에도 읽는다.
    비밀번호·토큰은 그 파일에도 없고, 있더라도 출력하지 않는다.
 2. 없으면 `~/.claude/skills/verify-impl/scripts/scan-targets.sh <repo>` 를 실행한다.
+   repo 안에서 접속 정보·자격증명을 못 찾았으면 상위 폴더의 이웃 repo 설정 파일에서 그 대상 이름(서비스·CSP 이름)이 든 파일의 **경로만** 찾아 올린다. 값은 출력하지 않는다.
 3. 스크립트 출력을 사람이 판단할 수 있는 형태로 정리한다. 원시 출력을 그대로 붙이지 않는다.
 4. 스크립트가 놓쳤을 만한 곳을 보강한다: `README` 의 how-to-run, `docs/`, CI 워크플로의 실행 커맨드.
 
