@@ -264,15 +264,15 @@ MANIFEST="$DEST/$MANIFEST_NAME"
 # 도구를 부르기 직전 글이 사용자 언어와 다르면 같은 턴 안에서 모델에게 알린다 (lang-guard.py).
 # python 으로 기록을 읽으므로 python 이 있을 때만 건다.
 lang_cmd() { # <설치위치>
-  printf 'P="%s/skills/shared/scripts/lang-guard.py"; [ -f "$P" ] && %s "$P"; exit 0' "$1" "$PY"
+  printf 'P="%s/skills/shared/scripts/lang-guard.py"; [ -f "$P" ] && %s "$P"; exit 0' "$1" "${HOOK_PY:-$PY}"
 }
 # 횟수 상한 없는 대기 루프(until, sleep 이 든 while)를 실행 전에 막는다 (until-guard.py). Bash 에만 건다.
 guard_cmd() { # <설치위치>
-  printf 'P="%s/skills/shared/scripts/until-guard.py"; [ -f "$P" ] && %s "$P"; exit 0' "$1" "$PY"
+  printf 'P="%s/skills/shared/scripts/until-guard.py"; [ -f "$P" ] && %s "$P"; exit 0' "$1" "${HOOK_PY:-$PY}"
 }
 # 돌고 있는 작업을 거느린 프로세스를 kill 하려 하면 사용자에게 확인받게 한다 (kill-guard.py). Bash 에만 건다.
 kill_cmd() { # <설치위치>
-  printf 'P="%s/skills/shared/scripts/kill-guard.py"; [ -f "$P" ] && %s "$P"; exit 0' "$1" "$PY"
+  printf 'P="%s/skills/shared/scripts/kill-guard.py"; [ -f "$P" ] && %s "$P"; exit 0' "$1" "${HOOK_PY:-$PY}"
 }
 
 # 링크 검사 뒤에 자동 업데이트(self-update.sh)를 부른다. 원격 확인은 떼어서 띄우므로 기다리지 않는다.
@@ -563,6 +563,230 @@ if [ "$CHECK" -eq 1 ]; then
   [ "$INST" -eq 1 ] && exit 1
   exit 0
 fi
+
+# --- python·jq·sshpass 가 없으면 설치할지 묻는다 ---
+# python 이 없으면 훅(lang-guard, until-guard, kill-guard)과 지난 세션 검색을 못 쓴다.
+# jq 는 eval(verify-impl/evals)을 돌릴 때만 쓴다. 설치한 skill 은 jq 없이 동작한다.
+# sshpass 는 verify-impl 이 비밀번호로 SSH 접속할 때 쓴다. Windows 는 winget 판, Linux 는 배포판 패키지, macOS 는 brew.
+# python: Windows 는 winget, Linux 는 /etc/os-release 로 배포판 계열을 보고 그 패키지 관리자, macOS 는 brew.
+# jq: Windows 는 winget 이 있으면 winget, 그 밖에는 jq 릴리스의 최신 안정판 실행 파일을 받아 체크섬을 확인하고 둔다.
+# 설치할 명령을 보여 주고 물은 뒤에만 한다. 묻지 못하는 실행(--yes, 터미널 아님)에서는 명령만 보여준다.
+win_local() {
+  local la="${LOCALAPPDATA:-$HOME/AppData/Local}"
+  command -v cygpath >/dev/null 2>&1 && la=$(cygpath -u "$la")
+  printf '%s' "$la"
+}
+find_win_python() { # 설치 위치의 python.exe (새 버전 먼저). Store 가짜는 Programs 아래에 없다
+  local d
+  while IFS= read -r d; do
+    [ -x "$d/python.exe" ] && "$d/python.exe" -c 'import sys' >/dev/null 2>&1 && { printf '%s' "$d/python.exe"; return 0; }
+  done < <(ls -d "$(win_local)"/Programs/Python/Python3* 2>/dev/null | sort -rV)
+  return 1
+}
+find_python() { # PATH 에서 실제로 도는 python
+  local c
+  for c in python3 python py; do
+    command -v "$c" >/dev/null 2>&1 && "$c" -c 'import sys' >/dev/null 2>&1 && { printf '%s' "$c"; return 0; }
+  done
+  return 1
+}
+# jq 를 둘 곳. Linux·macOS 는 ~/.local/bin, Windows(Git Bash)는 Git Bash 가 PATH 에 넣는 ~/bin
+jq_bin_dir() { if is_windows; then printf '%s' "$HOME/bin"; else printf '%s' "$HOME/.local/bin"; fi; }
+find_jq() { # PATH, 내가 두는 곳, winget 설치 위치 순. 찾으면 이번 실행의 PATH 에 넣는다
+  local d
+  command -v jq >/dev/null 2>&1 && return 0
+  for d in "$(jq_bin_dir)" "$(win_local)"/Microsoft/WinGet/Links "$(win_local)"/Microsoft/WinGet/Packages/jqlang.jq_*; do
+    { [ -x "$d/jq" ] || [ -x "$d/jq.exe" ]; } && { PATH="$d:$PATH"; export PATH; return 0; }
+  done
+  return 1
+}
+confirm() { # <설치 명령 설명> - 물어서 그렇다고 하면 0
+  local a
+  if [ "$DRY" -eq 1 ]; then say "  (dry-run) 이 명령으로 설치할지 물었을 것입니다: $1"; return 1; fi
+  if ! ask; then say "  묻지 않는 실행이라 설치하지 않았습니다. 직접 설치: $1"; return 1; fi
+  say "  설치 명령: $1"
+  printf '%s' "  설치할까요? [Y/n]: "; read -r a || a=n
+  case "${a:-y}" in [Nn]*) say "  설치하지 않았습니다."; return 1 ;; esac
+}
+SUDO=""
+need_root() { # 패키지 설치에 붙일 sudo. root 면 없음. sudo 도 없으면 1
+  if [ "$(id -u 2>/dev/null)" = 0 ]; then SUDO=""; return 0; fi
+  command -v sudo >/dev/null 2>&1 || return 1
+  SUDO="sudo "
+}
+linux_pkg_cmd() { # <패키지 이름> - 배포판 계열에 맞는 설치 명령 (sudo 없이). arch 는 python 을 python3 대신 python 으로 받는다
+  local pkg="$1" apkg="$1" id="" like="" f
+  [ "$pkg" = python3 ] && apkg=python
+  [ -r /etc/os-release ] && { id=$(. /etc/os-release; printf '%s' "${ID:-}"); like=$(. /etc/os-release; printf '%s' "${ID_LIKE:-}"); }
+  for f in $id $like; do
+    case "$f" in
+      # tzdata 같은 의존 패키지가 터미널에 질문을 띄우고 멈춘다(깨끗한 ubuntu 컨테이너에서 시간대 질문). 묻지 않게 한다
+      debian|ubuntu) printf '%s' "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y $pkg"; return 0 ;;
+      fedora|rhel|centos|rocky|almalinux|ol|amzn)
+        local dnf=dnf; command -v dnf >/dev/null 2>&1 || dnf=yum
+        # RHEL 계열(rocky·alma 등)은 sshpass 가 EPEL 에 있다. fedora 는 기본 저장소에 있다
+        case "$pkg:$id" in sshpass:rhel|sshpass:centos|sshpass:rocky|sshpass:almalinux|sshpass:ol)
+          printf '%s' "$dnf install -y epel-release && $dnf install -y $pkg"; return 0 ;;
+        esac
+        printf '%s' "$dnf install -y $pkg"; return 0 ;;
+      suse|opensuse|opensuse-leap|opensuse-tumbleweed|sles) printf '%s' "zypper --non-interactive install $pkg"; return 0 ;;
+      # Arch 는 부분 업그레이드(-Sy 뒤 설치)를 지원하지 않는다. 컨테이너에서 openssl 파일 충돌로 실패했다. 시스템 전체를 같이 올린다
+      arch|manjaro) printf '%s' "pacman -Syu --needed --noconfirm $apkg"; return 0 ;;
+      alpine) printf '%s' "apk add --no-cache $pkg"; return 0 ;;
+    esac
+  done
+  return 1
+}
+linux_install() { # <패키지 이름> - 물어보고 설치. 0 이면 설치 명령이 성공했다
+  local cmd
+  cmd=$(linux_pkg_cmd "$1") || { say "  배포판을 알아보지 못했습니다 (/etc/os-release). 배포판의 패키지 관리자로 $1 를 설치하세요."; return 1; }
+  need_root || { say "  root 가 아니고 sudo 도 없어 설치하지 않습니다. root 로 실행: $cmd"; return 1; }
+  confirm "${SUDO}sh -c '$cmd'" || return 1
+  # 설치 명령이 사용자 터미널 입력을 읽지 않게 막는다 (apt 가 터미널에 쌓인 입력을 먹었다). sudo 비밀번호는 /dev/tty 로 받는다
+  ${SUDO}sh -c "$cmd" </dev/null || { say "  설치가 실패했습니다."; return 1; }
+}
+offer_python() { # 0 이면 PY 를 새로 정했다
+  local cmd _p
+  say
+  say "python 이 없습니다. 훅(lang-guard, until-guard, kill-guard)과 지난 세션 검색에 씁니다."
+  if is_windows; then
+    if _p=$(find_win_python); then   # 깔려 있지만 PATH 에 없는 python. 훅에도 이 경로를 넣는다
+      PY="$_p"; say "  PATH 에는 없지만 설치 위치에 있어 이것을 씁니다: $PY"; return 0
+    fi
+    command -v winget >/dev/null 2>&1 || { say "  winget 이 없습니다. https://www.python.org/downloads/ 에서 설치한 뒤 다시 돌리세요."; return 1; }
+    cmd="winget install --id Python.Python.3.13 -e --scope user --accept-source-agreements --accept-package-agreements"
+    confirm "$cmd" || return 1
+    $cmd || { say "  winget 설치가 실패했습니다."; return 1; }
+    if _p=$(find_win_python); then
+      PY="$_p"; HOOK_PY="python"   # 새로 열리는 셸은 PATH 로 python 을 찾는다. 버전이 바뀌어도 훅이 안 깨진다
+      say "  설치했습니다: $PY"; return 0
+    fi
+    say "  설치는 끝났지만 python.exe 를 찾지 못했습니다. 터미널을 다시 열고 이 스크립트를 다시 돌리세요."; return 1
+  fi
+  case "$(uname -s 2>/dev/null)" in
+    Darwin*)
+      command -v brew >/dev/null 2>&1 || { say "  brew 가 없습니다. https://brew.sh 로 brew 를 깔거나 https://www.python.org/downloads/ 에서 설치하세요."; return 1; }
+      cmd="brew install python"
+      confirm "$cmd" || return 1
+      brew install python </dev/null || { say "  brew 설치가 실패했습니다."; return 1; } ;;
+    *) linux_install python3 || return 1 ;;
+  esac
+  hash -r 2>/dev/null
+  if _p=$(find_python); then PY="$_p"; say "  설치했습니다: $(command -v "$PY")"; return 0; fi
+  say "  설치는 끝났지만 python 을 찾지 못했습니다. 터미널을 다시 열고 이 스크립트를 다시 돌리세요."; return 1
+}
+fetch() { # <URL> <저장 경로>
+  if command -v curl >/dev/null 2>&1; then curl -fsSL --connect-timeout 15 --max-time 300 -o "$2" "$1"
+  elif command -v wget >/dev/null 2>&1; then wget -q -T 60 -O "$2" "$1"
+  else return 2; fi
+}
+latest_jq_tag() { # releases/latest 가 넘겨주는 주소에서 최신 안정판 태그를 읽는다 (사전 릴리스는 안 잡힌다)
+  local u
+  if command -v curl >/dev/null 2>&1; then
+    u=$(curl -fsSLI -o /dev/null -w '%{url_effective}' --connect-timeout 15 --max-time 60 https://github.com/jqlang/jq/releases/latest) || return 1
+  else
+    u=$(wget -q -T 60 --max-redirect=5 -S --spider https://github.com/jqlang/jq/releases/latest 2>&1 | sed -n 's/^ *[Ll]ocation: *//p' | tail -1 | tr -d '\r')
+  fi
+  u="${u##*/tag/}"
+  case "$u" in jq-[0-9]*) printf '%s' "$u" ;; *) return 1 ;; esac
+}
+jq_asset() { # 이 OS·아키텍처의 실행 파일 이름
+  local os arch
+  case "$(uname -s 2>/dev/null)" in
+    Linux*) os=linux ;; Darwin*) os=macos ;; MINGW*|MSYS*|CYGWIN*) os=windows ;; *) return 1 ;;
+  esac
+  case "$(uname -m 2>/dev/null)" in
+    x86_64|amd64) arch=amd64 ;; aarch64|arm64) arch=arm64 ;; armv7l|armv7*) arch=armhf ;; i?86) arch=i386 ;; *) return 1 ;;
+  esac
+  [ "$os" = macos ] && [ "$arch" != amd64 ] && [ "$arch" != arm64 ] && return 1
+  [ "$os" = windows ] && { printf '%s' "jq-windows-$arch.exe"; return 0; }
+  printf '%s' "jq-$os-$arch"
+}
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1
+  elif command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | cut -d' ' -f1
+  else return 1; fi
+}
+install_jq_binary() { # 최신 안정판 실행 파일을 받아 체크섬이 맞을 때만 둔다
+  local tag asset dir tmp want got name rc=1
+  asset=$(jq_asset) || { say "  이 OS·아키텍처($(uname -s) $(uname -m))용 jq 실행 파일이 릴리스에 없습니다."; return 1; }
+  tag=$(latest_jq_tag) || { say "  jq 최신 릴리스를 확인하지 못했습니다 (네트워크). 직접 받기: https://github.com/jqlang/jq/releases/latest"; return 1; }
+  dir=$(jq_bin_dir); name=jq; is_windows && name=jq.exe
+  confirm "https://github.com/jqlang/jq/releases/download/$tag/$asset 를 받아 sha256sum.txt 로 확인한 뒤 $dir/$name 에 둔다" || return 1
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/jq-dl.XXXXXX") || return 1
+  if ! fetch "https://github.com/jqlang/jq/releases/download/$tag/$asset" "$tmp/$asset" \
+     || ! fetch "https://github.com/jqlang/jq/releases/download/$tag/sha256sum.txt" "$tmp/sha256sum.txt"; then
+    say "  내려받지 못했습니다 (curl 이나 wget, 네트워크를 확인하세요)."
+  else
+    # awk 가 없는 배포판이 있어(opensuse 컨테이너) 셸로 읽는다. 줄 모양: <해시>  <파일> 또는 <해시> *<파일>
+    want=""
+    while read -r h f; do [ "${f#\*}" = "$asset" ] && { want="$h"; break; }; done < "$tmp/sha256sum.txt"
+    got=$(sha256_of "$tmp/$asset")
+    if [ -z "$want" ] || [ -z "$got" ] || [ "$want" != "$got" ]; then
+      say "  체크섬이 맞지 않아 버렸습니다 (기대 ${want:-없음}, 받은 것 ${got:-계산 못 함})."
+    elif mkdir -p "$dir" && cp "$tmp/$asset" "$dir/$name" && chmod 755 "$dir/$name" && "$dir/$name" --version >/dev/null 2>&1; then
+      rc=0
+    else
+      say "  $dir/$name 에 두지 못했거나 실행되지 않습니다."
+    fi
+  fi
+  # 받은 파일은 이름을 적어 지운다
+  rm -f "$tmp/$asset" "$tmp/sha256sum.txt"; rmdir "$tmp" 2>/dev/null
+  [ "$rc" -eq 0 ] || return 1
+  case ":$PATH:" in *":$dir:"*) ;; *)
+    PATH="$dir:$PATH"; export PATH
+    say "  $dir 가 PATH 에 없어 이번 실행에만 붙였습니다. 셸 설정(~/.bashrc 등)에 export PATH=\"$dir:\$PATH\" 를 넣으세요." ;;
+  esac
+  say "  설치했습니다: $dir/$name ($("$dir/$name" --version 2>/dev/null))"
+}
+offer_jq() {
+  say
+  say "jq 가 없습니다. eval(verify-impl/evals)을 돌릴 때 씁니다. 설치한 skill 은 jq 없이 동작합니다."
+  if is_windows && command -v winget >/dev/null 2>&1; then
+    local cmd="winget install --id jqlang.jq -e --accept-source-agreements --accept-package-agreements"
+    confirm "$cmd" || return 1
+    $cmd || { say "  winget 설치가 실패했습니다."; return 1; }
+    find_jq && { say "  설치했습니다: $(command -v jq)"; return 0; }
+    say "  설치는 끝났지만 jq.exe 를 찾지 못했습니다. 터미널을 다시 열면 잡힙니다."; return 1
+  fi
+  install_jq_binary
+}
+find_sshpass() { # PATH 또는 winget 설치 위치. 찾으면 이번 실행의 PATH 에 넣는다
+  local d
+  usable sshpass && return 0
+  is_windows || return 1
+  for d in "$(win_local)"/Microsoft/WinGet/Links "$(win_local)"/Microsoft/WinGet/Packages/xhcoding.sshpass-win32_*; do
+    [ -x "$d/sshpass.exe" ] && { PATH="$d:$PATH"; export PATH; usable sshpass && return 0; }
+  done
+  return 1
+}
+offer_sshpass() {
+  say
+  say "sshpass 가 없습니다. verify-impl 이 비밀번호로 SSH 접속할 때 씁니다. SSH 키(VH_KEY)만 쓰면 필요 없습니다."
+  if is_windows; then
+    # Windows 는 winget 판(sshpass-win32)만 쓴다 (2026-11-13 결정). Git Bash 의 ssh 와는 물리지 않아 ssh-run.sh 가 Windows OpenSSH 를 고른다
+    command -v winget >/dev/null 2>&1 || { say "  winget 이 없어 설치하지 않습니다. SSH 키(VH_KEY)를 쓰세요."; return 1; }
+    local cmd="winget install --id xhcoding.sshpass-win32 -e --accept-source-agreements --accept-package-agreements"
+    confirm "$cmd" || return 1
+    $cmd || { say "  winget 설치가 실패했습니다."; return 1; }
+    find_sshpass && { say "  설치했습니다: $(command -v sshpass)"; return 0; }
+    say "  설치는 끝났지만 sshpass.exe 를 찾지 못했습니다. 터미널을 다시 열면 잡힙니다."; return 1
+  fi
+  case "$(uname -s 2>/dev/null)" in
+    Darwin*)
+      command -v brew >/dev/null 2>&1 || { say "  brew 가 없습니다. https://brew.sh 로 brew 를 깐 뒤 brew install sshpass 를 하거나 SSH 키(VH_KEY)를 쓰세요."; return 1; }
+      confirm "brew install sshpass" || return 1
+      brew install sshpass </dev/null || { say "  brew 설치가 실패했습니다."; return 1; } ;;
+    *) linux_install sshpass || return 1 ;;
+  esac
+  hash -r 2>/dev/null
+  usable sshpass && { say "  설치했습니다: $(command -v sshpass)"; return 0; }
+  say "  설치는 끝났지만 sshpass 를 찾지 못했습니다."; return 1
+}
+HOOK_PY=""
+[ -n "$PY" ] || offer_python
+find_jq || offer_jq
+find_sshpass || offer_sshpass
 
 # 설치 전에 점검한다. 필수가 빠진 채로 깔아 두면 검증 도중에 알게 된다.
 preflight

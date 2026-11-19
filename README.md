@@ -96,6 +96,18 @@ Bash 명령에 상한 없는 `until` 루프나 `sleep` 이 든 `while` 루프가
 
 `--yes` 로 설치하면 이 세 훅은 묻지 않고 건너뜁니다. 같이 걸려면 `--hook lang-guard`, `--hook until-guard`, `--hook kill-guard` 를 줍니다.
 
+**python·jq·sshpass 가 없으면 설치할지 물어봅니다.** 실행할 명령을 보여 주고 `[Y/n]` 로 묻습니다.
+
+| 무엇 | 쓰는 곳 | Windows | Linux | macOS |
+|------|---------|---------|-------|-------|
+| python | 위 훅들, 지난 세션 검색 | winget (사용자 범위) | `/etc/os-release` 로 배포판 계열을 보고 apt·dnf(yum)·zypper·pacman(`-Syu`)·apk | brew |
+| jq | eval(`verify-impl/evals`). 설치한 skill 은 jq 없이 동작 | winget, 없으면 실행 파일 | jq 릴리스의 최신 안정판 실행 파일을 `~/.local/bin` 에 | 실행 파일 |
+| sshpass | verify-impl 의 비밀번호 SSH. SSH 키만 쓰면 필요 없음 | winget 판 `xhcoding.sshpass-win32` | 배포판 패키지 (RHEL 계열은 EPEL 을 먼저) | brew |
+
+- 리눅스 패키지 설치는 root 가 아니면 `sudo` 를 붙입니다. sudo 가 없으면 명령만 보여줍니다.
+- jq 실행 파일은 같은 릴리스의 `sha256sum.txt` 로 확인하고, 맞지 않으면 버립니다. Windows 는 Git Bash 가 PATH 에 넣는 `~/bin` 에 둡니다.
+- winget 으로 깐 것은 터미널을 다시 열어야 PATH 에 잡혀서, 설치 위치에서 찾아 그 실행에 바로 씁니다.
+- `--yes` 나 터미널이 아닌 실행에서는 설치하지 않고 명령만 보여줍니다.
 이미 설치한 다른 PC 는 자동 업데이트로 스크립트만 받고 훅 등록은 안 되므로, 쓰려면 `install.sh` 를 한 번 다시 돌립니다.
 
 훅은 `settings.json` 에 넣습니다. 사용자 파일이라 **묻지 않고 넣지 않고**, 이미 있는 다른 훅은
