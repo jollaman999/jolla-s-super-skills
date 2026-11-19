@@ -209,6 +209,7 @@ LINKS=(
   "verify-impl:skills/verify-impl"
   "deploy-verify:skills/deploy-verify"
   "release-cut:skills/release-cut"
+  "session-restore:skills/session-restore"
   "shared:skills/shared"
   "hooks:skills/hooks"
 )

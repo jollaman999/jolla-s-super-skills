@@ -242,6 +242,7 @@ Git Bash 안에서는 `/c/Users/<이름>/.claude/...` 로 보입니다.
 | [`verify-impl/`](verify-impl/) | 실노드에 붙어 구현이 정말 실행되는지 검증합니다. 서브에이전트가 탐색·검증·반증·진단을 나눠 맡아 동시에 확인합니다. |
 | [`deploy-verify/`](deploy-verify/) | 빌드부터 재기동까지 배포합니다. 되돌리기 어려운 단계마다 먼저 물어봅니다. |
 | [`release-cut/`](release-cut/) | 태그를 찍고 릴리즈 노트와 바이너리를 올립니다. 따라가야 할 다른 repo 가 있으면 알려줍니다. |
+| [`session-restore/`](session-restore/) | 재부팅 전에 도는 Claude 세션들을 적어 두고, 재부팅 뒤 tmux 세션으로 같은 디렉터리에서 대화를 이어 엽니다. 저장도 복원도 먼저 묻습니다. Linux 전용입니다. |
 | [`agents/`](agents/) | verify-impl 과 plan-run 이 불러 쓰는 서브에이전트들입니다. 탐색·검증·반증·진단과 구현·대조를 나눠 맡습니다. |
 | [`shared/`](shared/) | 여러 skill 이 같이 쓰는 도구입니다. 동시 세션 감지, 스냅샷, repo 스타일 파악, 지난 세션 검색, 연동 repo 스캔을 합니다. |
 | [`hooks/`](hooks/) | 시크릿 유출과 잘못된 커밋 메시지를 커밋 시점에 막습니다. |
