@@ -10,7 +10,12 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 G="$HERE/until-guard.py"
-PY=$(command -v python3 || command -v python) || { echo "python 이 없습니다"; exit 2; }
+# 이름만 보고 고르지 않는다. Windows 에는 실행하면 rc=49 로 끝나는 Store 가짜 python3 가 PATH 앞에 있을 수 있다.
+PY=""
+for _c in python3 python py; do
+  command -v "$_c" >/dev/null 2>&1 && "$_c" -c 'import sys' >/dev/null 2>&1 && { PY="$_c"; break; }
+done
+[ -n "$PY" ] || { echo "python 이 없습니다"; exit 2; }
 
 PASS=0; FAIL=0
 
