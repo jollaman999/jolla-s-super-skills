@@ -14,7 +14,7 @@
 #   --dry-run     : 무엇을 할지만 출력하고 아무것도 안 바꾼다
 #   --uninstall   : 이 스크립트가 설치한 것만 지운다 (남의 파일은 안 건드린다)
 #   --yes         : 물어보지 않고 기본값(전역·링크)으로 진행한다. 묻는 훅은 건너뛴다
-#   --hook NAME   : 그 훅(lang-guard, until-guard)은 묻지 않고 건다. 여러 번 줄 수 있다. --yes 와 같이 쓴다
+#   --hook NAME   : 그 훅(lang-guard, until-guard, kill-guard)은 묻지 않고 건다. 여러 번 줄 수 있다. --yes 와 같이 쓴다
 #
 # 범위를 안 주고 터미널에서 실행하면 물어본다. 파이프나 CI 에서는 전역으로 간다.
 #
@@ -55,7 +55,7 @@ while [ $# -gt 0 ]; do
     --uninstall)  UNINSTALL=1 ;;
     --check)      CHECK=1 ;;
     --yes|-y)     YES=1 ;;
-    --hook)       shift; case "${1:-}" in lang-guard|until-guard) HOOKS="$HOOKS$1 " ;; *) echo "모르는 훅: ${1:-} (lang-guard, until-guard)" >&2; exit 2 ;; esac ;;
+    --hook)       shift; case "${1:-}" in lang-guard|until-guard|kill-guard) HOOKS="$HOOKS$1 " ;; *) echo "모르는 훅: ${1:-} (lang-guard, until-guard, kill-guard)" >&2; exit 2 ;; esac ;;
     -h|--help)    usage; exit 0 ;;
     *) echo "모르는 인자: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -270,6 +270,10 @@ lang_cmd() { # <설치위치>
 guard_cmd() { # <설치위치>
   printf 'P="%s/skills/shared/scripts/until-guard.py"; [ -f "$P" ] && %s "$P"; exit 0' "$1" "$PY"
 }
+# 돌고 있는 작업을 거느린 프로세스를 kill 하려 하면 사용자에게 확인받게 한다 (kill-guard.py). Bash 에만 건다.
+kill_cmd() { # <설치위치>
+  printf 'P="%s/skills/shared/scripts/kill-guard.py"; [ -f "$P" ] && %s "$P"; exit 0' "$1" "$PY"
+}
 
 # 링크 검사 뒤에 자동 업데이트(self-update.sh)를 부른다. 원격 확인은 떼어서 띄우므로 기다리지 않는다.
 # 검사 스크립트에 못 닿을 때의 알림은 settings.json 에 박히므로 python 없이 셸만으로 훅 JSON 을 낸다.
@@ -482,6 +486,11 @@ if [ "$UNINSTALL" -eq 1 ]; then
       if [ "$DRY" -eq 1 ]; then say "  제거   settings.json 의 PreToolUse 훅 (until-guard)"
       elif hook_edit "$DEST/settings.json" remove PreToolUse until-guard.py; then say "  제거   settings.json 의 PreToolUse 훅 (until-guard)"
       else say "  건너뜀 settings.json 의 PreToolUse 훅 (until-guard)  (고칠 도구가 없거나 읽을 수 없음). 직접 지우세요"; fi
+    fi
+    if grep -qxF "hook=PreToolUse-kill" "$MANIFEST" 2>/dev/null; then
+      if [ "$DRY" -eq 1 ]; then say "  제거   settings.json 의 PreToolUse 훅 (kill-guard)"
+      elif hook_edit "$DEST/settings.json" remove PreToolUse kill-guard.py; then say "  제거   settings.json 의 PreToolUse 훅 (kill-guard)"
+      else say "  건너뜀 settings.json 의 PreToolUse 훅 (kill-guard)  (고칠 도구가 없거나 읽을 수 없음). 직접 지우세요"; fi
     fi
     remove_state
     run rm -f "$MANIFEST"
@@ -812,6 +821,46 @@ else
       [Nn]*) say "  넣지 않았습니다." ;;
       *)     if hook_edit "$SET" add PreToolUse until-guard.py "$(guard_cmd "$DEST")" 5 Bash; then
                echo "hook=PreToolUse" >> "$MANIFEST"
+               say "  넣었습니다: $SET"
+             else
+               say "  넣지 못했습니다 (설정 파일을 읽을 수 없거나 도구가 없습니다). 그대로 두었습니다."
+             fi ;;
+    esac
+  fi
+fi
+
+# --- 프로세스 종료 확인 훅 (물어보고 넣는다) ---
+# "돌고 있는 작업의 프로세스는 죽이기 전에 묻는다" 는 문서로는 안 지켜졌다(eval E62, 문구 두 가지 모두 0/3).
+# kill 대상이 자식 프로세스를 거느리면 확인 창을 띄운다. /proc 를 보므로 리눅스에서만 동작하고 나머지는 그냥 통과한다.
+if grep -q "kill-guard.py" "$SET" 2>/dev/null; then
+  echo "hook=PreToolUse-kill" >> "$MANIFEST"  # 이미 걸려 있다. 새로 쓴 기록에 다시 적는다
+elif [ "$DRY" -eq 1 ]; then
+  say
+  say "  (dry-run) 프로세스 종료 확인 훅(PreToolUse)을 걸지 물었을 것입니다"
+elif [ -z "$PY" ]; then
+  say
+  say "  python 이 없어 프로세스 종료 확인 훅(kill-guard)은 걸지 않습니다."
+elif [[ "$HOOKS" == *" kill-guard "* ]]; then
+  say
+  if hook_edit "$SET" add PreToolUse kill-guard.py "$(kill_cmd "$DEST")" 5 Bash; then
+    echo "hook=PreToolUse-kill" >> "$MANIFEST"; say "  --hook kill-guard: 프로세스 종료 확인 훅을 넣었습니다: $SET"
+  else say "  --hook kill-guard: 넣지 못했습니다 (설정 파일을 읽을 수 없거나 도구가 없습니다)."; fi
+else
+  say
+  say "돌고 있는 작업을 거느린 프로세스를 끝내기 전에 확인받게 하는 훅을 걸 수 있습니다."
+  say "  하는 일: kill·pkill·killall 대상 아래에 돌고 있는 프로세스가 있으면 실행 전에 확인 창을 띄운다 (리눅스만)"
+  say "  /proc 만 읽고, 네트워크 없음. 걸리지 않으면 아무 말도 안 합니다"
+  if ! ask; then
+    say
+    if [ "$YES" -eq 1 ]; then say "  --yes 라 묻지 않고 건너뛰었습니다. 걸려면 --hook kill-guard 를 같이 주세요."
+    else                      say "  터미널이 아니라 물어볼 수 없어 건너뛰었습니다."; fi
+  else
+    a=y
+    printf '%s' "  $SET 에 넣을까요? [Y/n]: "; read -r a || a=""
+    case "${a:-y}" in
+      [Nn]*) say "  넣지 않았습니다." ;;
+      *)     if hook_edit "$SET" add PreToolUse kill-guard.py "$(kill_cmd "$DEST")" 5 Bash; then
+               echo "hook=PreToolUse-kill" >> "$MANIFEST"
                say "  넣었습니다: $SET"
              else
                say "  넣지 못했습니다 (설정 파일을 읽을 수 없거나 도구가 없습니다). 그대로 두었습니다."

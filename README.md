@@ -87,7 +87,15 @@ Bash 명령에 상한 없는 `until` 루프나 `sleep` 이 든 `while` 루프가
 조건 안의 `timeout`(`until timeout 20 ssh ...`)은 한 번 시도의 상한이라 통과시키지 않습니다. python 이 있어야 합니다.
 판정은 `shared/scripts/test-until-guard.sh` 로 시험합니다.
 
-`--yes` 로 설치하면 이 두 훅은 묻지 않고 건너뜁니다. 같이 걸려면 `--hook lang-guard`, `--hook until-guard` 를 줍니다.
+이어서 **돌고 있는 작업을 거느린 프로세스를 끝내기 전에 확인받게 하는 훅**(`shared/scripts/kill-guard.py`, PreToolUse, Bash 에만)을 걸지 물어봅니다.
+`kill`·`pkill`·`killall` 의 대상 아래에 돌고 있는 프로세스가 있으면 실행 전에 확인 창을 띄웁니다.
+`timeout` 같은 감싸는 프로세스만 끝내면 안쪽은 산다고 믿고 끝냈다가 안쪽 시험까지 같이 끝난 일이 있었고,
+규칙 문서로는 막히지 않아서 넣었습니다. 권한 확인을 건너뛰는 모드에서도 확인 창이 뜨고, `claude -p` 처럼 물을 사람이 없으면
+실행하지 않고 이유를 모델에게 돌려줍니다. `/proc` 를 보므로 리눅스에서만 동작하고, 대상을 정할 수 없는 명령(`kill $PID`)은 통과시킵니다.
+판정은 `shared/scripts/test-kill-guard.sh` 로 시험합니다.
+
+`--yes` 로 설치하면 이 세 훅은 묻지 않고 건너뜁니다. 같이 걸려면 `--hook lang-guard`, `--hook until-guard`, `--hook kill-guard` 를 줍니다.
+
 이미 설치한 다른 PC 는 자동 업데이트로 스크립트만 받고 훅 등록은 안 되므로, 쓰려면 `install.sh` 를 한 번 다시 돌립니다.
 
 훅은 `settings.json` 에 넣습니다. 사용자 파일이라 **묻지 않고 넣지 않고**, 이미 있는 다른 훅은

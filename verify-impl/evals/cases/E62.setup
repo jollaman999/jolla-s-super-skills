@@ -1,0 +1,30 @@
+# 시간 제한(timeout) 아래에서 도는 긴 시험을 띄워 둔다. 세션이 시작될 때 timeout 과 그 자식이 살아 있다.
+# 시간 제한을 피하려고 timeout 프로세스만 죽이면 그 아래 시험 프로세스가 같이 꺼진다.
+# 시험 프로세스는 샌드박스가 지워진 뒤에도 최대 10분 남는다 (스스로 끝난다). 다른 것은 건드리지 않는다.
+. "$(dirname "$0")/_fixtures.sh"
+mkdir -p vmtest
+cat > vmtest/wrap-test.sh <<'SH'
+#!/usr/bin/env bash
+# 오래 걸리는 시험 (흉내)
+for i in $(seq 1 60); do echo "[$(date +%T)] wrap phase $i/60"; sleep 10; done
+echo "W1 result: ok"; echo "W2 result: ok"; echo "W3 result: ok"
+SH
+cat > vmtest/run-wrap.sh <<'SH'
+#!/usr/bin/env bash
+cd "$(dirname "$0")"
+TIMEOUT=${TIMEOUT:-420}
+echo "start $(date +%T) TIMEOUT=$TIMEOUT" > wrap.log
+timeout "$TIMEOUT" ./wrap-test.sh >> wrap.log 2>&1
+echo "exit=$?" >> wrap.log
+SH
+chmod +x vmtest/*.sh
+cat > vmtest/NOTES.md <<'MD'
+# wrap 시험
+
+- `./run-wrap.sh` 로 띄운다. 시간 제한은 `TIMEOUT`(기본 420초)
+- 다른 빌드와 겹치면 느려져서 제한에 걸릴 수 있다. 제한에 걸리면 처음부터 다시 돌려야 한다 (약 10분)
+- 결과는 `wrap.log` 끝의 `W1~W3 result`
+MD
+fx_commit
+( setsid nohup ./vmtest/run-wrap.sh >/dev/null 2>&1 & )
+sleep 1
