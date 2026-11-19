@@ -180,10 +180,29 @@ run_session() { # <프롬프트파일> <proj> <cfg> <out>
 # 탭은 TSV 구분자라 못 쓰고, 눈에 보이는 문자는 명령 본문에 그대로 나올 수 있어 못 쓴다.
 NLMARK=$'\001'
 
-# stream-json 에서 도구 호출만 순서대로 뽑는다
-tool_calls() {
-  jq -r --arg nl "$NLMARK" 'select(.type=="assistant") | .message.content[]?
+# PreToolUse 훅이 막아 실행되지 않은 도구 호출의 id.
+# 1순위: result 줄의 permission_denials. 훅이 deny·ask 를 냈거나 exit 2 로 막으면 여기 들어간다.
+#   여러 턴이면 턴마다 result 가 있으니 전부 모은다.
+# 2순위: tool_result 가 is_error 이고 "PreToolUse:" 로 시작하는 것. deny·exit 2 의 결과 모양이다.
+#   턴이 잘려 result 줄이 없을 때를 위한 것이다.
+# 훅이 exit 1 같은 오류로 끝나면 막지 않고 명령이 실행된다. 이때는 둘 다에 안 걸려 실행으로 센다.
+blocked_ids() {
+  jq -r 'select(.type=="result") | .permission_denials[]?.tool_use_id // empty' "$1" 2>/dev/null
+  jq -r 'select(.type=="user") | .message.content[]?
+         | select(.type=="tool_result" and .is_error == true)
+         | select((.content | if type=="array" then (map(.text? // "") | join("")) else ((. // "") | tostring) end)
+                  | startswith("PreToolUse:"))
+         | .tool_use_id // empty' "$1" 2>/dev/null
+}
+
+# stream-json 에서 도구 호출만 순서대로 뽑는다.
+# 두 번째 인자로 run 을 주면 훅이 막아 실행되지 않은 호출을 뺀다 (실행 여부를 보는 판정용).
+tool_calls() { # <기록> [run]
+  local skip='[]'
+  [ "${2:-}" = run ] && skip=$(blocked_ids "$1" | jq -Rsc 'split("\n") | map(select(length > 0))')
+  jq -r --arg nl "$NLMARK" --argjson skip "$skip" 'select(.type=="assistant") | .message.content[]?
          | select(.type=="tool_use")
+         | select(.id as $i | $skip | any(.[]; . == $i) | not)
          | [.name, ((.input.command // .input.file_path // .input.skill // .input.prompt // "") | tostring | gsub($nl;"") | gsub("\n";$nl))]
          | @tsv' "$1" 2>/dev/null | untsv
 }
@@ -472,7 +491,7 @@ blank_quoted() {
 judge() { # <규칙> <sandbox> <proj> <cfg> <out> [before]
   local rule="$1" sandbox="$2" proj="$3" cfg="$4" out="$5" cmp=0 before=""
   [ "$#" -ge 6 ] && { cmp=1; before="$6"; }
-  local status answer calls bash_cmds bash_recs first early hit bare err w c t e line rec orig bl i after
+  local status answer calls bash_cmds bash_recs first early hit bare err w c t e line rec orig bl i after blk
   local -a why warn needs bans bad ban tos leaks exs need want_skills want_agents want_files
   # 규칙을 보기 전에 세션이 제대로 돌았는지부터 본다. 로그인이 풀린 세션의
   # 빈 답변을 "규칙을 안 지켰다" 로 읽으면 그게 무음 실패다.
@@ -587,9 +606,13 @@ EOF
   # 명령 안의 탭까지 공백으로 바뀐다. 필드를 건드리지 않고 도구 이름만 떼어낸다.
   # bash_recs 는 도구 호출 하나가 한 줄(줄바꿈은 표식). bash_cmds 는 그것을
   # 물리적 줄로 편 것이다. 예외는 호출 단위로, 명령 탐지는 줄 단위로 봐야 한다.
-  bash_recs=$(printf '%s\n' "$calls" | awk -F'\t' '$1=="Bash"{ sub(/^[^\t]*\t/, ""); print }' \
+  # 훅이 막아 실행되지 않은 호출은 여기서 뺀다. 금지명령·timeout필수 는 실행을 보는 판정이다.
+  bash_recs=$(tool_calls "$out" run | awk -F'\t' '$1=="Bash"{ sub(/^[^\t]*\t/, ""); print }' \
               | strip_heredoc)
   bash_cmds=$(printf '%s\n' "$bash_recs" | tr "$NLMARK" '\n')
+  # 뺀 것이 조용히 사라지면 시도 자체가 안 보이므로 건수를 경고로 남긴다
+  blk=$(blocked_ids "$out" | sort -u | grep -c .)
+  [ "${blk:-0}" -gt 0 ] && warn+=("훅이 막아 실행 안 된 호출 ${blk}건은 실행 판정에서 뺌")
   IFS=',' read -ra bad <<<"$(rule_get "$rule" "금지명령")"
   for c in "${bad[@]}"; do
     c="$(printf '%s' "$c" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
@@ -711,7 +734,16 @@ run_once() { # <케이스이름> <규칙파일> <프롬프트파일>
     copy=(--copy)
   fi
   rm -f "$sandbox/.lt" "$sandbox/.lk"
-  CLAUDE_CONFIG_DIR="$cfg" "$REPO/install.sh" --global --yes "${copy[@]}" >"$sandbox/install.log" 2>&1 || {
+  # --yes 는 묻는 훅을 건너뛴다. 케이스가 훅을 재려면 규칙의 "훅" 에 적은 이름을 --hook 으로 넘긴다.
+  # install.sh 가 모르는 이름이면 install.sh 가 실패해 아래 설치 오류로 잡힌다.
+  local -a hooks=() hk
+  local h
+  IFS=',' read -ra hk <<<"$(rule_get "$rule" "훅")"
+  for h in "${hk[@]}"; do
+    h="${h// /}"; [ -n "$h" ] || continue
+    hooks+=(--hook "$h")
+  done
+  CLAUDE_CONFIG_DIR="$cfg" "$REPO/install.sh" --global --yes "${copy[@]}" "${hooks[@]}" >"$sandbox/install.log" 2>&1 || {
     printf 'R:설치 오류 (%s)\n' "$sandbox/install.log"; return; }
 
   # 케이스가 가짜 프로젝트를 요구하면 만들어 둔다
