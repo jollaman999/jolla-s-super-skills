@@ -57,8 +57,6 @@ git status --porcelain | head
 
 여러 repo 를 한 번에 올리는 일이 잦다.
 
-> "collector, workflow, migrator **모두 v0.6.0 릴리즈** 해줘"
-
 확인할 것:
 - 어느 repo 들, 각각 어느 버전
 - **기준 구간** - `v0.5.0 부터 지금까지` 인지 `직전 태그 이후` 인지. 여기서 갈리면 노트 전체가 어긋난다.
@@ -78,8 +76,7 @@ git log --oneline -20 --format='%s'        # 커밋 제목 스타일(언어·접
 세션에서 실제로 쓰인 구조 → `references/notes.md`. 섹션 이름이 바뀐 전례가 있으니
 **직전 릴리즈를 정본으로 삼는다.**
 
-> "`Integrated or tested with` 이거는 `Tested With` 이라고 쓰고"
-> "`commonmodel` 은 이제 없어"
+옛 섹션 이름과 이미 없어진 모듈을 노트에 그대로 적었다가 고친 적이 있다.
 
 ## 3. 버전이 적힌 곳 모두 갱신
 
@@ -98,8 +95,6 @@ grep -rIn "v\?$OLD" --include='*.go' --include='*.yaml' --include='*.yml' \
 
 **하위 컴포넌트 버전을 먼저 올린다.** agent 가 있는 repo 는 agent 버전 커밋이 릴리즈보다 앞이다.
 실제 커밋: `agent: Bump the version to v0.6.1`.
-
-> "collector 같은 경우는 **agent 버전 먼저** v0.6.0 으로 하고 릴리즈하고 바이너리들 업로드"
 
 ## 4. 변경 목록 수집
 
@@ -128,7 +123,7 @@ git log --oneline "$PREV..HEAD" --no-merges --format='%h %s'
 9절에서 그 PR 을 만들 때 다시 묻지 않는다. 다만 승인 뒤에 PR 내용이 바뀌면(버전·대상이 달라짐) 다시 묻는다.
 PR 을 만드는 시점은 그대로 9절의 **CD 가 이미지를 다 만든 뒤**다.
 
-> 노트를 승인받은 뒤 PR 초안에서 또 멈췄다가 "해 제발 해" 를 들었다.
+노트를 승인받은 뒤 PR 초안에서 또 멈춰 같은 건으로 승인을 두 번 받은 적이 있다.
 
 ## 6. 커밋 · 태그 · push
 
@@ -184,9 +179,7 @@ done
 어디를 어떻게 고쳐야 하는지까지 적어서 올리고, 사용자가 그 repo 를 지목하면 그때 반영한다.
 절차 → `../shared/references/downstream.md`
 
-> "릴리즈 한거 CD 다 돌아서 Docker Image 완성되면 **stackctl 의 docker-compose.yaml 에 v0.5.2 박은 다음에**"
-
-이 인용처럼 사용자가 그 repo 를 함께 지목했으면 반영까지 간다. 그때도 **CD 가 이미지를 다 만든 뒤**다.
+사용자가 그 repo 를 함께 지목했으면(예: 연동 repo 의 compose 파일에 새 이미지 태그를 넣으라고 했으면) 반영까지 간다. 그때도 **CD 가 이미지를 다 만든 뒤**다.
 없는 이미지를 가리키는 커밋을 먼저 밀지 않는다.
 
 ## 10. 배포

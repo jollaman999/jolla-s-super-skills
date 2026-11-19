@@ -261,8 +261,8 @@ SCOPE=("${SOURCE[@]}")
 #   3) ~/.claude/hook-org-patterns   전 repo 공통
 #
 # 형식: 한 줄에 정규식 하나. '#' 로 시작하는 줄과 빈 줄은 무시한다.
-#   innogrid
-#   (^|[^-])o11y-manager        <- 부분 문자열 오탐을 막으려면 직접 경계를 준다
+#   example-corp
+#   (^|[^-])internal-app        <- 부분 문자열 오탐을 막으려면 직접 경계를 준다
 if [ "$PROFILE" = public ]; then
   ORG_FILES=()
   [ -n "${HOOK_ORG_PATTERNS:-}" ] && ORG_FILES+=("$HOOK_ORG_PATTERNS")
