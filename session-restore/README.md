@@ -32,7 +32,7 @@ tmux 안에서 돌던 것은 같은 이름의 tmux 세션으로, 그냥 터미�
 | 스크립트 | 하는 일 |
 |----------|---------|
 | `scripts/snapshot.sh [-n]` | tmux 패널마다 아래로 내려가며 Claude 프로세스를 찾고, 남은 `~/.claude/sessions/<pid>.json` 중 살아 있는 Claude 를 tmux 밖 세션으로 더해 세션 ID·디렉터리·실행 옵션을 적는다. `-n` 은 보여주기만 |
-| `scripts/restore.sh [-n] [기록 파일]` | 줄마다 같은 이름의 tmux 세션을 만들고 그 안에서 claude 를 `--resume` 으로 실행한다. 이미 있는 이름과 사라진 디렉터리는 건너뛴다. `-n` 은 무엇을 열지만 |
+| `scripts/restore.sh [-n] [기록 파일]` | 줄마다 같은 이름의 tmux 세션을 만들고 그 안에서 claude 를 `--resume` 으로 실행한다. 그 대화가 이미 다른 곳에서 열려 있으면(같은 세션 ID 의 claude 가 돌고 있으면), 같은 이름의 tmux 세션이 이미 있으면, 디렉터리가 사라졌으면 건너뛴다. `-n` 은 무엇을 열지만 |
 
 실행 옵션은 원래 프로세스의 명령줄에서 가져오고, `-c`/`--continue`/`--resume`/`--session-id` 만 빼고
 `--resume <세션 ID>` 를 붙입니다.

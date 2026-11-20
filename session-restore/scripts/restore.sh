@@ -2,7 +2,7 @@
 # snapshot.sh 가 적은 Claude Code 세션을 같은 이름·같은 디렉터리의 tmux 세션에서 다시 연다.
 # 원래 tmux 밖(그냥 터미널)에서 돌던 세션도 tmux 세션으로 연다.
 # usage: restore.sh [-n] [IN]   -n 이면 열지 않고 무엇을 열지만 보여준다
-# 같은 이름의 tmux 세션이 이미 있거나 디렉터리가 사라졌으면 건너뛴다.
+# 그 대화가 이미 어디선가 열려 있거나, 같은 이름의 tmux 세션이 이미 있거나, 디렉터리가 사라졌으면 건너뛴다.
 # 연 뒤 패널에서 claude 가 실제로 도는지 15초까지 기다려 본다.
 set -euo pipefail
 DRY=0
@@ -13,8 +13,28 @@ IN=${1:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/session-restore/last.tsv}
 command -v tmux >/dev/null || { echo "tmux 가 없습니다" >&2; exit 1; }
 
 echo "기록: $IN ($(date -r "$IN" '+%F %T'))"
+
+# 지금 도는 Claude 의 세션 ID. 같은 대화를 두 군데서 열지 않으려고 본다.
+# 기록 파일만 남은 것(프로세스가 끝났거나 pid 가 다른 프로그램에 다시 쓰임)은 거른다.
+RUNNING=$(SESS_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/sessions" python3 -I -c '
+import glob, json, os
+for rec in glob.glob(os.path.join(os.environ["SESS_DIR"], "*.json")):
+    pid = os.path.basename(rec)[:-5]
+    try:
+        with open(f"/proc/{pid}/cmdline", "rb") as f:
+            argv0 = f.read().split(b"\0")[0].decode()
+        if os.path.basename(argv0) == "claude":
+            print(json.load(open(rec))["sessionId"])
+    except (OSError, ValueError, KeyError):
+        pass
+' || true)
+
 OPENED=()
 while IFS=$'\t' read -r name cwd sid label origin cmd; do
+	if printf '%s\n' "$RUNNING" | grep -qxF -- "$sid"; then
+		echo "건너뜀 $name ($label): 이 대화가 이미 열려 있음"
+		continue
+	fi
 	if tmux has-session -t "=$name" 2>/dev/null; then
 		echo "건너뜀 $name ($label): 같은 이름의 tmux 세션이 이미 있음"
 		continue
