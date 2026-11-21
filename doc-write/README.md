@@ -82,7 +82,7 @@ WHY_HWP_VERSION=v0.3.0 bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh 
 | [`references/formats-submit.md`](references/formats-submit.md) | 정부과제 보고서·사업계획서·요구사항·제안서·SW 등록 명세서 |
 | [`references/formats-present.md`](references/formats-present.md) | 발표 pptx, 발표·리뷰용 md |
 | [`references/formats-repo.md`](references/formats-repo.md) | 외부 README, 설계 문서, 협업 기관 공유 문서, 개발자 문서, 시험 기록 |
-| [`references/formats-draft.md`](references/formats-draft.md) | 메일, MR·PR, Jira, Slack |
+| [`references/formats-draft.md`](references/formats-draft.md) | 메일, MR·PR, Jira, Slack, 붙여 준 샘플처럼 대화창에 정리 |
 
 ## 다른 skill 과
 

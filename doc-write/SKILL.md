@@ -1,6 +1,6 @@
 ---
 name: doc-write
-description: 문서가 산출물인 일을 맡는다. 받은 자료를 전부 열어 분석하고, 담당·독자·그림·파일명을 분석 근거와 추천 답을 붙여 한 번에 물은 뒤 쓴다. 그림과 결과물(md·txt·hwp/hwpx·pptx·docx)을 만들고 검증해서 실제 경로로 보고한다. TRIGGER - "문서 써줘", "md 로 뽑아줘", "README 고쳐", "보고서", "계획서", "제안서", "요구사항", "발표 자료", "워크샵", "리뷰 자료", "그림 넣어", "구조도", "메일 초안", "MR 초안", "PR 본문", "Jira 티켓", "Slack 답변", "답할 것 써줘", "명세서", hwp·hwpx·pptx·docx 를 쓰거나 고치라고 할 때, 또는 결과물이 사람이 읽을 문서일 때. 말이 아니라 산출물이 문서인지로 가른다. SKIP - 릴리즈 노트(release-cut), 코드 주석, 커밋 메시지, 문서를 만드는 도구·스크립트·코드를 만들 때(design-first), 문서 내용이 지금 코드·동작과 맞는지 확인만 할 때(verify-impl).
+description: 문서가 산출물인 일을 맡는다. 받은 자료를 전부 열어 분석하고, 담당·독자·그림·파일명을 분석 근거와 추천 답을 붙여 한 번에 물은 뒤 쓴다. 그림과 결과물(md·txt·hwp/hwpx·pptx·docx)을 만들고 검증해서 실제 경로로 보고한다. TRIGGER - "문서 써줘", "md 로 뽑아줘", "README 고쳐", "보고서", "계획서", "제안서", "요구사항", "발표 자료", "워크샵", "리뷰 자료", "그림 넣어", "구조도", "메일 초안", "MR 초안", "PR 본문", "Jira 티켓", "Slack 답변", "답할 것 써줘", "명세서", "이 hwp 정리해줘", "요약해줘", "이 글처럼 써줘", hwp·hwpx·pptx·docx 를 쓰거나 고치거나 정리·요약하라고 할 때, 또는 결과물이 사람이 읽을 문서일 때. 말이 아니라 산출물이 문서인지로 가른다. SKIP - 릴리즈 노트(release-cut), 코드 주석, 커밋 메시지, 문서를 만드는 도구·스크립트·코드를 만들 때(design-first), 문서 내용이 지금 코드·동작과 맞는지 확인만 할 때(verify-impl).
 ---
 
 # doc-write
@@ -20,7 +20,7 @@ description: 문서가 산출물인 일을 맡는다. 받은 자료를 전부 �
 | [`references/formats-submit.md`](references/formats-submit.md) | 제출 양식: 정부과제 보고서·사업계획서·요구사항·제안서·SW 등록 명세서 |
 | [`references/formats-present.md`](references/formats-present.md) | 발표·리뷰: 발표 pptx, 발표·리뷰용 md |
 | [`references/formats-repo.md`](references/formats-repo.md) | repo 문서: 외부 README, 설계 문서, 협업 기관 공유 문서, 개발자 문서 |
-| [`references/formats-draft.md`](references/formats-draft.md) | 붙여 넣을 초안: 메일 txt, MR·PR, Jira, Slack |
+| [`references/formats-draft.md`](references/formats-draft.md) | 붙여 넣을 초안: 메일 txt, MR·PR, Jira, Slack, 붙여 준 샘플처럼 대화창에 정리 |
 
 ## 절대 규칙
 
@@ -55,6 +55,7 @@ description: 문서가 산출물인 일을 맡는다. 받은 자료를 전부 �
 | 8 | 보고 | 보실 문서 경로 하나, 못 한 것과 근거 약한 것 |
 
 **그림이 없는 초안(메일·MR·Jira·Slack)은 5를 건너뛴다.** 질문도 그 종류에 걸리는 것만 한다 (3단계).
+**붙여 준 샘플처럼 대화창에 정리하는 일은 3을 건너뛰고 5·6도 없다** (3단계 예외).
 
 ## 0. 동시 세션 확인
 
@@ -126,6 +127,12 @@ WH=$(bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh --which) || echo "
 
 **사용자가 이미 말한 것은 묻지 않는다.** 그 답을 표에 "말씀하신 대로" 로 적고 넘어간다.
 **그 종류에 안 걸리는 질문은 뺀다.** Jira 초안에 그림 질문을 하지 않는다.
+
+**묻지 않고 바로 쓰는 경우.** 아래는 3단계를 건너뛴다.
+
+| 경우 | 대신 할 것 |
+|------|------------|
+| 붙여 준 샘플처럼 대화창에 정리 ("이 글처럼 이 hwp 를 정리해줘") | 샘플의 줄 수·깊이·항목 모양을 맞춘 것만 내고, 덧붙일 말은 끝에 한 줄로 묻는다 (`formats-draft.md` 7절) |
 분석 근거를 붙여 묻는 형식은 `questions.md` 3절에 예가 있다.
 
 **답을 받으면 첫 줄에 독자와 종류를 한 줄로 알리고 쓴다.**
@@ -141,7 +148,7 @@ WH=$(bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh --which) || echo "
 | 정부과제 보고서, 사업계획서, 요구사항 정의서, 제안서, SW 등록 명세서 | `formats-submit.md` |
 | 발표 pptx, 발표·리뷰용 md | `formats-present.md` |
 | 외부 README, 설계 문서, 협업 기관 공유 문서, 개발자 repo 문서 | `formats-repo.md` |
-| 메일, MR·PR, Jira, Slack | `formats-draft.md` |
+| 메일, MR·PR, Jira, Slack, 붙여 준 샘플처럼 대화창에 정리 | `formats-draft.md` |
 
 **틀보다 사용자가 준 양식·예시가 먼저다.** 틀은 양식이 없을 때 쓴다.
 
