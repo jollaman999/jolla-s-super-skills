@@ -161,9 +161,9 @@ preflight() {
   if [ -n "$PY" ]; then
     pf_ok "python: $PY (지난 세션 검색, 최근 편집 목록, settings.json 병합에 씁니다)"
   elif [ -n "$PS" ]; then
-    pf_warn "python 없음 - 지난 세션 검색과 최근 편집 목록은 못 씁니다. settings.json 은 $PS 로 고칩니다"
+    pf_warn "python 없음 - 최근 편집 목록은 못 씁니다. 지난 세션 검색은 jq 가 있으면 jq 로 대신합니다. settings.json 은 $PS 로 고칩니다"
   else
-    pf_warn "python 도 powershell 도 없음 - 지난 세션 검색·최근 편집 목록과 훅 자동 설치가 안 됩니다"
+    pf_warn "python 도 powershell 도 없음 - 최근 편집 목록과 훅 자동 설치가 안 됩니다. 지난 세션 검색은 jq 가 있으면 jq 로 대신합니다"
   fi
 
   say
@@ -565,8 +565,8 @@ if [ "$CHECK" -eq 1 ]; then
 fi
 
 # --- python·jq·sshpass 가 없으면 설치할지 묻는다 ---
-# python 이 없으면 훅(lang-guard, until-guard, kill-guard)과 지난 세션 검색을 못 쓴다.
-# jq 는 eval(verify-impl/evals)을 돌릴 때만 쓴다. 설치한 skill 은 jq 없이 동작한다.
+# python 이 없으면 훅(lang-guard, until-guard, kill-guard)을 못 쓰고, 지난 세션 검색은 jq 로 대신 돈다.
+# jq 는 eval(verify-impl/evals)과, python 이 없을 때 지난 세션 검색(session-grep.sh)에 쓴다.
 # sshpass 는 verify-impl 이 비밀번호로 SSH 접속할 때 쓴다. Windows 는 winget 판, Linux 는 배포판 패키지, macOS 는 brew.
 # python: Windows 는 winget, Linux 는 /etc/os-release 로 배포판 계열을 보고 그 패키지 관리자, macOS 는 brew.
 # jq: Windows 는 winget 이 있으면 winget, 그 밖에는 jq 릴리스의 최신 안정판 실행 파일을 받아 체크섬을 확인하고 둔다.
@@ -648,7 +648,7 @@ linux_install() { # <패키지 이름> - 물어보고 설치. 0 이면 설치 �
 offer_python() { # 0 이면 PY 를 새로 정했다
   local cmd _p
   say
-  say "python 이 없습니다. 훅(lang-guard, until-guard, kill-guard)과 지난 세션 검색에 씁니다."
+  say "python 이 없습니다. 훅(lang-guard, until-guard, kill-guard)에 씁니다. 지난 세션 검색은 jq 로도 됩니다."
   if is_windows; then
     if _p=$(find_win_python); then   # 깔려 있지만 PATH 에 없는 python. 훅에도 이 경로를 넣는다
       PY="$_p"; say "  PATH 에는 없지만 설치 위치에 있어 이것을 씁니다: $PY"; return 0
@@ -741,7 +741,7 @@ install_jq_binary() { # 최신 안정판 실행 파일을 받아 체크섬이 �
 }
 offer_jq() {
   say
-  say "jq 가 없습니다. eval(verify-impl/evals)을 돌릴 때 씁니다. 설치한 skill 은 jq 없이 동작합니다."
+  say "jq 가 없습니다. eval(verify-impl/evals)과, python 이 없을 때 지난 세션 검색에 씁니다."
   if is_windows && command -v winget >/dev/null 2>&1; then
     local cmd="winget install --id jqlang.jq -e --accept-source-agreements --accept-package-agreements"
     confirm "$cmd" || return 1
