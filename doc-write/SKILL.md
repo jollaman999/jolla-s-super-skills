@@ -85,7 +85,7 @@ WH=$(bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh --which) || echo "
 | `.pdf`, 이미지 | Read (PDF 는 `pages` 로 나눠 읽는다) |
 | `.pptx` | zip 이다. `unzip -l` 로 슬라이드 목록, `unzip -p <파일> ppt/slides/slideN.xml` 의 `<a:t>` 가 글자다 |
 | md, txt, 코드 | Read |
-| "기존에 ~한 것처럼" 의 이전 산출물 | 그 폴더의 이전 파일, repo 의 템플릿, 지난 세션 기록 (`~/.claude/skills/shared/scripts/session-grep.sh`) |
+| "기존에 ~한 것처럼" 의 이전 산출물 | 그 폴더의 이전 파일, 이전 연차·차수의 같은 종류 산출물 폴더 (`questions.md` 1.4), repo 의 템플릿, 지난 세션 기록 (`~/.claude/skills/shared/scripts/session-grep.sh`) |
 
 **"N차년도 실적" 같은 말은 맞는 해의 자료를 고른다.** 그해 실적은 그해 하반기(2차) 자료에 있다.
 이름이 비슷한 다른 해 자료를 열고 끝내지 않는다.
