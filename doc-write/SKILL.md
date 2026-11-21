@@ -17,6 +17,7 @@ description: 문서가 산출물인 일을 맡는다. 받은 자료를 전부 �
 | [`references/writing.md`](references/writing.md) | 쓰기 규칙과 근거(실제로 있었던 실패) |
 | [`references/figures.md`](references/figures.md) | 그림 원칙, 스타일 사양, 출력별 넣는 법, 검사 |
 | [`references/hwp.md`](references/hwp.md) | why-hwp 로 hwp/hwpx 를 읽고 고치는 순서와 함정 |
+| [`references/office-com.md`](references/office-com.md) | Word COM 으로 docx 를 만들 때의 순서와 함정 |
 | [`references/formats-submit.md`](references/formats-submit.md) | 제출 양식: 정부과제 보고서·사업계획서·요구사항·제안서·SW 등록 명세서 |
 | [`references/formats-present.md`](references/formats-present.md) | 발표·리뷰: 발표 pptx, 발표·리뷰용 md |
 | [`references/formats-repo.md`](references/formats-repo.md) | repo 문서: 외부 README, 설계 문서, 협업 기관 공유 문서, 개발자 문서 |
@@ -178,7 +179,7 @@ WH=$(bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh --which) || echo "
 | txt (메일 등) | 마크다운 기호 없이 |
 | hwp/hwpx | `references/hwp.md`. 원본은 복사해서 사본을 고친다 |
 | pptx | 지정 템플릿 덱을 복사해서 고친다. 처음부터 새로 만들지 않는다 |
-| docx | 양식 사본을 고친다. 고칠 도구(docx skill 등)가 없으면 그렇다고 알리고, md 와 옮길 위치 표로 대신할지 **물어서 승인받은 뒤** 만든다. 승인 전에는 대체물을 최종 산출물로 내지 않는다 |
+| docx | 양식 사본을 고친다. docx skill(`anthropic-skills:docx`)이 있으면 그쪽이 먼저고, Word COM 을 쓰면 `references/office-com.md` 를 따른다. 고칠 도구가 없으면 그렇다고 알리고, md 와 옮길 위치 표로 대신할지 **물어서 승인받은 뒤** 만든다. 승인 전에는 대체물을 최종 산출물로 내지 않는다 |
 
 **사용자가 말한 형식 그대로 낸다.** "txt" 면 txt, "계단식" 이면 `-` 들여쓰기, "뽑아" 면 파일이다.
 
