@@ -33,7 +33,8 @@
 
 ```sh
 ~/.claude/skills/shared/scripts/session-grep.sh '<검색어>' -p <프로젝트이름 조각> -s <YYYY-MM-DD>
-# exit 0=매치 있음  1=매치 없음  2=확인 불가(기록 디렉터리·python3 없음)
+# exit 0=매치 있음  1=매치 없음  2=확인 불가(기록 디렉터리 없음, python·jq 둘 다 없음, 정규식 오류)
+# python 이 없거나 Windows Store 스텁뿐이면 jq 로 돈다. 정규식은 그때 jq(Oniguruma) 문법이다
 ```
 
 `-r both` 로 assistant 발화까지, `-l` 로 매치된 세션 파일만, `-m` 으로 출력 건수 상한을 조절한다.

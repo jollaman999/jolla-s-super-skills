@@ -100,8 +100,8 @@ Bash 명령에 상한 없는 `until` 루프나 `sleep` 이 든 `while` 루프가
 
 | 무엇 | 쓰는 곳 | Windows | Linux | macOS |
 |------|---------|---------|-------|-------|
-| python | 위 훅들, 지난 세션 검색 | winget (사용자 범위) | `/etc/os-release` 로 배포판 계열을 보고 apt·dnf(yum)·zypper·pacman(`-Syu`)·apk | brew |
-| jq | eval(`verify-impl/evals`). 설치한 skill 은 jq 없이 동작 | winget, 없으면 실행 파일 | jq 릴리스의 최신 안정판 실행 파일을 `~/.local/bin` 에 | 실행 파일 |
+| python | 위 훅들, 지난 세션 검색 (없으면 jq 로 대신 찾음) | winget (사용자 범위) | `/etc/os-release` 로 배포판 계열을 보고 apt·dnf(yum)·zypper·pacman(`-Syu`)·apk | brew |
+| jq | eval(`verify-impl/evals`), python 이 없을 때 지난 세션 검색. 그 밖의 skill 은 jq 없이 동작 | winget, 없으면 실행 파일 | jq 릴리스의 최신 안정판 실행 파일을 `~/.local/bin` 에 | 실행 파일 |
 | sshpass | verify-impl 의 비밀번호 SSH. SSH 키만 쓰면 필요 없음 | winget 판 `xhcoding.sshpass-win32` | 배포판 패키지 (RHEL 계열은 EPEL 을 먼저) | brew |
 
 - 리눅스 패키지 설치는 root 가 아니면 `sudo` 를 붙입니다. sudo 가 없으면 명령만 보여줍니다.
