@@ -86,6 +86,8 @@ Bash 명령에 상한 없는 `until` 루프나 `sleep` 이 든 `while` 루프가
 모델에게 돌려줍니다. 기다리던 대상이 죽으면 그런 루프는 세션이 끝날 때까지 남는데, 규칙 문서에 적어 둔 뒤에도
 계속 나와서 넣었습니다. 루프 안의 수 비교(`[ $n -ge 60 ]`)나 루프 전체를 감싼 `timeout 600 bash -c '...'` 가 있으면 통과입니다.
 조건 안의 `timeout`(`until timeout 20 ssh ...`)은 한 번 시도의 상한이라 통과시키지 않습니다. python 이 있어야 합니다.
+같은 훅이 **검증 명령(`go test`·`make`·`pytest`·`bash -n` 등)과 `git commit` 을 한 호출에 넣은 것**도 막습니다.
+`(go test ...; echo rc=$?) && git commit` 이나 `make | tail && git commit` 은 검증이 실패해도 커밋돼서, 실패한 커밋이 실제로 남았습니다.
 판정은 `shared/scripts/test-until-guard.sh` 로 시험합니다.
 
 이어서 **돌고 있는 작업을 거느린 프로세스를 끝내기 전에 확인받게 하는 훅**(`shared/scripts/kill-guard.py`, PreToolUse, Bash 에만)을 걸지 물어봅니다.

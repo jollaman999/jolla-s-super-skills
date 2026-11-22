@@ -113,6 +113,42 @@ chk allow "Bash 가 아닌 도구는 안 본다" Monitor <<'CMD'
 until grep -q DONE /tmp/w/log; do sleep 5; done
 CMD
 
+echo "== 검증과 커밋을 한 호출에: 막아야 하는 것"
+chk deny "echo rc 가 실패를 삼키고 커밋" <<'CMD'
+cd /home/u/work/app && (go test ./internal/... 2>&1 | tail -5; echo rc=$?) && git add internal/api/x.go && git commit -q -m "fix: 응답 필드" && git log --oneline -1
+CMD
+chk deny "make 출력을 tail 로 받은 뒤 커밋" <<'CMD'
+make test 2>&1 | tail -20 && git commit -am "fix: 빌드"
+CMD
+chk deny "bash -n 결과와 상관없이 커밋" <<'CMD'
+bash -n scripts/run.sh; git add scripts/run.sh && git commit -m "fix: 경로"
+CMD
+chk deny "&& 로 이어도 출력을 보지 않고 커밋" <<'CMD'
+go build ./... && go vet ./... && git -C /home/u/work/app commit -q -m "build: 정리"
+CMD
+chk deny "timeout 으로 감싼 pytest 뒤 커밋" <<'CMD'
+timeout 600 pytest -q tests/ ; git commit -m "test: 보강"
+CMD
+
+echo "== 검증과 커밋을 한 호출에: 통과시켜야 하는 것"
+chk allow "add 와 commit 만" <<'CMD'
+git add a.go b.go && git diff --cached --stat && git commit -q -m "fix: 이름" && git log --oneline -1
+CMD
+chk allow "커밋 메시지 heredoc 안의 make" <<'CMD'
+git commit -F - <<'EOF'
+build: make test 를 CI 에 넣는다
+EOF
+CMD
+chk allow "검증만" <<'CMD'
+go test ./... 2>&1 | tail -5; echo rc=${pipestatus[1]}
+CMD
+chk allow "커밋 뒤에 검증 (커밋을 막는 실패가 아니다)" <<'CMD'
+git commit -q -m "docs: 문구" && bash shared/scripts/test-lang-guard.sh
+CMD
+chk allow "echo 로 찍는 문자열 안의 검증과 커밋" <<'CMD'
+echo "go test 뒤에 git commit 을 붙이지 말 것"
+CMD
+
 echo "== 깨진 입력"
 out=$(printf 'not json' | "$PY" "$G"); rc=$?
 if [ "$rc" -eq 0 ] && [ -z "$out" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "  실패  깨진 입력은 아무것도 안 내고 0 으로 끝나야 한다 (rc=$rc)"; fi

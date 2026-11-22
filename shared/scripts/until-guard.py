@@ -17,6 +17,13 @@
 #   변수에 담거나 echo 로 찍는 문자열은 실행되지 않으니 막지 않는다 (CMD='... until ...' 를 막은 오탐이 있었다).
 #   heredoc 본문은 셸이 받는 것(bash/sh/zsh/ssh <<)만 보고, 파이썬 코드나 파일로 쓰는 본문은 뺀다. 주석도 뺀다.
 #
+# 같은 자리(실행 전 Bash)에서 하나를 더 본다: 검증 명령과 git commit 을 한 호출에 넣은 것.
+#   규칙(CLAUDE.md "검증이 끝나야 커밋한다")은 있는데 `(go test ...; echo rc=$?) && git commit`, `make | tail && git commit`
+#   처럼 검증이 실패해도 커밋되는 모양이 10번 중 9번 나왔고, 실패한 커밋이 2개 남았다.
+#   검증(go test·make·pytest·bash -n ...)이 git commit 보다 앞에 있으면 연결 방식과 상관없이 막는다.
+#   && 로 이은 것도 막는다 - 검증 출력을 보지 않고 커밋하는 것이 같기 때문이다.
+#   이 검사를 따로 훅으로 두지 않은 것은, 이미 설치된 PC 들이 다시 설치하지 않아도 자동 업데이트만으로 걸리게 하려는 것이다.
+#
 # 입력: 훅 JSON (stdin). tool_name, tool_input.command 를 쓴다.
 # 출력: 막을 때만 permissionDecision=deny 를 담은 JSON 한 줄. 나머지는 아무것도 안 낸다.
 # 언제나 0 으로 끝난다. 이 훅이 깨지면 막지 않고 통과시킨다.
@@ -190,11 +197,51 @@ def uncapped_loops(command):
     return found
 
 
+# 명령 자리에 온 검증 명령과 git commit. 명령 자리 = 줄 처음, ; & | ( { 뒤, then/do 뒤
+CMDPOS = r"(?:^|(?<=[\n;&|({`'\"])|(?<=\bthen)|(?<=\bdo))[ \t]*(?:(?:sudo|time|timeout[ \t]+(?:-\S+[ \t]+)*\d+[smhd]?|env(?:[ \t]+\S+=\S*)*|\S+=\S*)[ \t]+)*"
+VERIFY = re.compile(
+    CMDPOS + r"((?:\S*/)?(?:"
+    r"go[ \t]+(?:test|build|vet)\b|make\b|gmake\b|pytest\b|python3?[ \t]+-m[ \t]+(?:pytest|unittest)\b|tox\b"
+    r"|npm[ \t]+(?:test|run[ \t]+(?:test|build|lint))\b|yarn[ \t]+(?:test|build|lint)\b|pnpm[ \t]+(?:test|build)\b"
+    r"|cargo[ \t]+(?:test|build|check|clippy)\b|mvn\b|gradle\b|\./gradlew\b|ctest\b|tsc\b"
+    r"|(?:bash|sh|zsh)[ \t]+-n\b|shellcheck\b|lint-shell\.sh\b|test-[\w-]+\.sh\b|run\.sh\b))"
+)
+COMMIT = re.compile(CMDPOS + r"(git(?:[ \t]+-C[ \t]+\S+)?[ \t]+commit\b)")
+
+
+def verify_then_commit(command):
+    """검증 명령 뒤에 git commit 이 오면 (검증, 커밋) 조각을 낸다. 없으면 None."""
+    text = strip_comments(strip_heredocs(command.replace("\r\n", "\n")))
+    spans = quote_spans(text)
+    commits = [m for m in COMMIT.finditer(text) if runs_as_shell(text, m.start(1), spans)]
+    if not commits:
+        return None
+    first_commit = commits[0].start(1)
+    for m in VERIFY.finditer(text):
+        if m.start(1) < first_commit and runs_as_shell(text, m.start(1), spans):
+            return m.group(1).strip(), commits[0].group(1).strip()
+    return None
+
+
 def main():
     d = json.load(sys.stdin)
     if d.get("tool_name") != "Bash":
         return
     cmd = (d.get("tool_input") or {}).get("command") or ""
+    if "commit" in cmd:
+        hit = verify_then_commit(cmd)
+        if hit:
+            msg = (
+                "[until-guard] 검증(`%s`)과 `%s` 을 한 호출에 넣어 실행하지 않았습니다. "
+                "`(...; echo rc=$?) && git commit` 이나 `make | tail && git commit` 은 검증이 실패해도 커밋되고, "
+                "&& 로 이어도 검증 출력을 보지 않고 커밋하게 됩니다 (CLAUDE.md git 쓰기 절 \"검증이 끝나야 커밋한다\"). "
+                "검증만 먼저 돌려 출력과 종료 코드를 보고, 통과했으면 다음 호출에서 git add·commit 하세요."
+                % hit
+            )
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse",
+                                                     "permissionDecision": "deny",
+                                                     "permissionDecisionReason": msg}}, ensure_ascii=False))
+            return
     if "until" not in cmd and "while" not in cmd:
         return
     loops = uncapped_loops(cmd)
