@@ -15,8 +15,9 @@
 docker save <img>:<tag> | gzip > /tmp/img.tar.gz
 LOCAL=$(md5sum /tmp/img.tar.gz | cut -c1-32)
 
-# 전송. 비밀번호는 SSHPASS 로 넘긴다 (sshpass -p 는 ps 에 보인다)
-export SSHPASS="$PW"
+# 전송. 비밀번호는 SSHPASS 로 넘긴다 (sshpass -p 와 export SSHPASS='값' 은 ps 에 보인다)
+# PWF = 대화로 받은 값을 Write 로 한 번 쓰고 chmod 600 한 스크래치패드 파일 (verify-impl/references/ssh.md)
+export SSHPASS="$(cat "$PWF")"
 timeout 300 sshpass -e scp -o StrictHostKeyChecking=no /tmp/img.tar.gz root@"$H":/data/docker/
 
 # 전송 무결성 - 로드 전에 확인한다
@@ -31,7 +32,7 @@ timeout 400 sshpass -e ssh -n -o StrictHostKeyChecking=no root@"$H" \
 ## 다중 호스트 - 한 대씩 (운영 권장)
 
 ```sh
-export SSHPASS="$PW"
+export SSHPASS="$(cat "$PWF")"
 for h in 192.0.2.11 192.0.2.12; do
   echo "===== $h ====="
   timeout 300 sshpass -e scp -o StrictHostKeyChecking=no /tmp/img.tar.gz root@"$h":/data/docker/

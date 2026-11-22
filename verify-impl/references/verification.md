@@ -30,7 +30,7 @@
 ### ssh (최우선)
 `scripts/ssh-run.sh`를 쓴다 - timeout·마스킹·점프호스트 내장, exit 0/1/2 = pass/fail/unknown.
 ```sh
-VH_HOST=192.0.2.11 VH_PW="$PW" VH_TO=60 scripts/ssh-run.sh VF-01 'docker inspect svc --format "{{.State.Health.Status}}"'
+VH_HOST=192.0.2.11 VH_PW="$(cat "$PWF")" VH_TO=60 scripts/ssh-run.sh VF-01 'docker inspect svc --format "{{.State.Health.Status}}"'
 ```
 직접 짤 때도 규칙 동일: `timeout` 필수, `StrictHostKeyChecking=no`, 비밀번호는 변수로.
 레시피 → `ssh.md`

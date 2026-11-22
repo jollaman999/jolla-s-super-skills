@@ -5,7 +5,8 @@
 ## 기본형
 
 ```sh
-export SSHPASS="$PW"   # sshpass -e 가 읽는다. 아래 예시는 모두 이것을 전제로 한다
+PWF=<스크래치패드>/pw-<호스트>   # 대화로 받은 비밀번호를 Write 로 한 번 쓰고 chmod 600 한 파일
+PW="$(cat "$PWF")"; export SSHPASS="$PW"   # sshpass -e 가 읽는다. 아래 예시는 모두 이것을 전제로 한다
 timeout 240 sshpass -e ssh -o StrictHostKeyChecking=no -p "$PORT" root@"$HOST" '원격명령'
 # 키 방식
 timeout 240 ssh -i /path/key -o StrictHostKeyChecking=no ubuntu@"$HOST" '원격명령'
@@ -16,6 +17,10 @@ timeout 240 ssh -i /path/key -o StrictHostKeyChecking=no ubuntu@"$HOST" '원격�
 - **`ssh -n` 필수** - 없으면 ssh 가 stdin 을 먹어 호출한 스크립트의 남은 줄과 `for`/`until` 루프를 통째로 삼킨다.
 - 일회성 호스트는 `-o UserKnownHostsFile=/dev/null`도 추가.
 - 비밀번호는 **변수로만**. 명령 원문을 evidence에 넣을 때 값이 전개되면 안 된다.
+- **명령 문자열에 값을 쓰지 않는다.** `export SSHPASS='값'` 도 그 Bash 호출의 셸 인자라 `ps` 에 보인다.
+  Bash 호출마다 셸이 새로 떠서 한 번 export 한 값이 다음 호출로 안 이어진다. 그래서 대화로 받은 값을 매번 명령에 적게 되는데,
+  한 세션에서 54번 그렇게 나갔고 같은 PC 의 다른 세션이 `ps` 에서 그 값을 봤다.
+  값은 스크래치패드에 파일로 한 번 쓰고(`Write` 뒤 `chmod 600`) 위처럼 `$(cat "$PWF")` 로 읽는다. 끝나면 `rm -f "$PWF"` 로 이름을 적어 지우고, 보고에 지웠다고 적는다.
 - **`sshpass -p` 를 쓰지 않는다.** 값이 프로세스 명령 줄(`ps`, Windows 의 `Win32_Process.CommandLine`)에 보인다.
   `SSHPASS` 환경 변수 + `sshpass -e` 로 넘긴다.
 - 비밀번호 접속인데 `Too many authentication failures` 로 끊기면 에이전트의 키가 먼저 시도된 것이다.

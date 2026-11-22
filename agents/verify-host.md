@@ -16,11 +16,13 @@ tools: Bash, Read
 항목을 하나씩 실행하고 판정한다. `~/.claude/skills/verify-impl/scripts/ssh-run.sh` 를 쓴다. timeout, 시크릿 마스킹, 점프호스트가 이미 들어 있고 exit code 가 0/1/2 = pass/fail/unknown 이다.
 
 ```sh
-VH_HOST=192.0.2.11 VH_USER=root VH_PW="$PW" VH_TO=60 \
+VH_HOST=192.0.2.11 VH_USER=root VH_PW="$(cat "$PWF")" VH_TO=60 \
   ~/.claude/skills/verify-impl/scripts/ssh-run.sh VF-01 'docker inspect app-svc --format "{{.State.Health.Status}}"'
 ```
 
 직접 짤 때도 규칙은 같다: `timeout` 필수, `ssh -n` 필수, `-o StrictHostKeyChecking=no`, 비밀번호는 변수로만.
+`PWF` 는 팀장이 넘겨준 비밀번호 파일 경로다. 값을 명령마다 직접 쓰지 않는다 (`ps` 에 보인다).
+값으로만 받았으면 첫 Bash 호출 한 번에서만 파일로 쓰고(`umask 077; printf '%s' '<값>' > <자기 스크래치 폴더>/pw`) 그 뒤로는 그 파일을 읽는다. 끝나면 이름을 적어 지운다.
 스크립트를 `bash -s` 처럼 표준 입력으로 넘기면 안의 명령(`ausearch`, `while read`, `exec -i` 등)이 남은 스크립트를 먹는다.
 뒤 줄이 안 돌거나 **0건이 나온다.** 끝에 `echo __END__` 를 두고 출력에 있는지 본다. 자세한 것은 `ssh.md` 의 "표준 입력으로 스크립트를 넘길 때".
 
