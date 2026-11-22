@@ -27,7 +27,8 @@ PINNED=0
 [ -n "$WANT" ] && PINNED=1
 
 DIR=$(cd "$DIR" 2>/dev/null && pwd -P) || { echo "경로 없음: $1" >&2; exit 2; }
-GITDIR=$(git -C "$DIR" rev-parse --git-dir 2>/dev/null) || { echo "git repo 아님: $DIR" >&2; exit 2; }
+# --git-common-dir: worktree 안에서 불러도 git 이 실제로 쓰는 .git/hooks 에 깐다 (pre-commit 과 같은 이유)
+GITDIR=$(git -C "$DIR" rev-parse --git-common-dir 2>/dev/null) || { echo "git repo 아님: $DIR" >&2; exit 2; }
 case "$GITDIR" in /*) ;; *) GITDIR="$DIR/$GITDIR" ;; esac
 HOOKS="$GITDIR/hooks"; mkdir -p "$HOOKS"
 
