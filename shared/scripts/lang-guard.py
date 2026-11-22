@@ -19,14 +19,17 @@ import tempfile
 import hashlib
 
 SCRIPTS = {
-    "한국어": re.compile(r"[가-힣]"),
+    # 자음·모음 낱자(ㄱ-ㆎ)도 한국어다. 사용자는 "ㄱㄱ", "ㅇㅇ" 처럼 낱자만으로 답한다.
+    # 완성형(가-힣)만 보면 그 뒤로 판정을 건너뛰어 영어 진행 줄을 놓쳤다.
+    "한국어": re.compile(r"[가-힣ㄱ-ㆎ]"),
     "일본어": re.compile(r"[぀-ヿ]"),
     "중국어": re.compile(r"[一-鿿]"),
     "러시아어": re.compile(r"[Ѐ-ӿ]"),
 }
 LATIN_WORD = re.compile(r"[A-Za-z]{2,}")
-MIN_WORDS = 4          # 이보다 짧은 영어 조각(명령 이름, 상태 한 단어)은 넘긴다
-TAIL_BYTES = 4 << 20   # 기록 끝에서 이만큼만 읽는다. 사용자 발화를 못 찾으면 판정하지 않는다
+PARENS = re.compile(r"\([^()]*\)")
+MIN_WORDS = 2          # 이보다 짧은 영어 조각(명령 이름, 상태 한 단어)은 넘긴다. "Still installing." 은 2단어다
+TAIL_BYTES = 4 << 20   # 기록 끝에서 이만큼만 읽는다. 사용자 발화를 못 찾으면 이 세션에서 전에 본 언어로 판정한다
 
 
 def strip_code(t):
@@ -101,17 +104,35 @@ def main():
         if ut is not None:
             utext = ut
             break
-    if not pending or utext is None:
+    if not pending:
         return
 
-    lang = next((n for n, rx in SCRIPTS.items() if rx.search(utext)), None)
+    base = os.path.join(tempfile.gettempdir(), "lang-guard-%s" % re.sub(r"\W", "", d.get("session_id", "x")))
+    # 사용자 언어를 세션마다 적어 둔다. 긴 작업 중에는 마지막 사용자 발화가 기록 끝 TAIL_BYTES 밖으로
+    # 밀려나는데(6MB 떨어진 경우가 있었다), 그때도 이 값으로 판정한다.
+    langfile = base + ".lang"
+    if utext is not None:
+        lang = next((n for n, rx in SCRIPTS.items() if rx.search(utext)), None)
+        try:
+            with open(langfile, "w") as f:
+                f.write(lang or "-")
+        except OSError:
+            pass
+    else:
+        try:
+            lang = open(langfile).read().strip()
+        except OSError:
+            return
+        if lang not in SCRIPTS:
+            return
     if lang is None:
         return  # 사용자가 영어(라틴 문자)로 쓰면 볼 것이 없다
     rx = SCRIPTS[lang]
 
     bad = []
     for t in reversed(pending):  # 쓴 순서대로
-        s = strip_code(t)
+        # 괄호 안만 사용자 언어인 글("Still waiting (20분 상한)")은 사용자 언어로 쓴 글이 아니다
+        s = PARENS.sub(" ", strip_code(t))
         if rx.search(s):
             continue
         if len(LATIN_WORD.findall(s)) >= MIN_WORDS:
@@ -121,7 +142,7 @@ def main():
 
     # 병렬 도구 호출이면 같은 글에 PostToolUse 가 여러 번 온다. 한 번만 알린다.
     key = hashlib.sha1("\n".join(bad).encode()).hexdigest()[:16]
-    seen = os.path.join(tempfile.gettempdir(), "lang-guard-%s" % re.sub(r"\W", "", d.get("session_id", "x")))
+    seen = base
     try:
         if key in open(seen).read().split():
             return
