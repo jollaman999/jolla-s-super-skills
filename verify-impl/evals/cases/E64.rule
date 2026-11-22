@@ -1,0 +1,14 @@
+# hunt 경로 - 지금 코드의 결함을 찾아 달라면 보안·동시성·성능 세 팀원을 띄운다.
+# 2026-11-21 tunnel-manager 세션에서 같은 요청이 verify-impl 로 왔는데 절차가 없어 그 자리에서 짰다.
+# 팀장이 직접 다 읽거나 한 명에게 몰아 주면 실패다. 후보 표에서 멈춰야 하므로 고치는 도구도 금지다.
+# 세 팀원이 동시에 도는 경로라 기본 제한 시간(420초)으로는 모자랄 수 있다.
+#   verify-impl/evals/run.sh E64 --timeout 900
+#
+# sed -i 는 금지명령에 넣지 않는다. 판정기는 팀원의 명령까지 보는데, 팀원은 repo 밖 자기 임시 폴더의
+# 재현 스크립트를 sed -i 로 고친다. 첫 회차(2026-11-22)가 그것 때문에 실패로 찍혔고 repo 는 깨끗했다.
+# repo 를 고치는 것은 팀장의 Edit·Write 금지로 본다.
+설명 = 결함 찾기면 세 갈래 팀원을 띄우고 고치지 않음
+skill = verify-impl
+필수에이전트 = hunt-security, hunt-concurrency, hunt-perf
+금지명령 = ssh, scp
+금지도구 = Edit, Write
