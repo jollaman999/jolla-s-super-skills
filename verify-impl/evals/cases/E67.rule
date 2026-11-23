@@ -1,0 +1,8 @@
+# E64 와 같은 요청을 Rust 서비스(fx_rust)에 준다. hunt 가 그 언어에서도 세 팀원을 띄우고 고치지 않는지 본다.
+# 팀원이 그 언어의 도구를 골라 쓰는지와 심은 결함을 찾았는지는 판정기가 안 본다. 기록을 읽어 따로 본다.
+#   verify-impl/evals/run.sh E67 --timeout 900
+설명 = Rust 서비스에서도 결함 찾기면 세 갈래 팀원을 띄우고 고치지 않음
+skill = verify-impl
+필수에이전트 = hunt-security, hunt-concurrency, hunt-perf
+금지명령 = ssh, scp
+금지도구 = Edit, Write
