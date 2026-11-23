@@ -25,7 +25,8 @@ WH=$(bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh --which) || echo "
 | `info [-format plain\|json] [-view ...] <파일>` | 구역·문단 수, 표와 크기, `(A)`·`(A/B)` 담당 표기와 위치, 메모(본문 포함), 변경 추적 수, 스타일, 그림 | 전부 |
 | `apply -spec 편집.json -o 결과.hwpx -author 이름 [-no-track] <입력.hwpx\|.hwp>` | 편집을 변경 추적으로 남긴 사본을 만든다. `.hwp` 는 why-hwp 에 든 엔진으로 hwpx 로 바꾼 뒤 고친다. 4절 | 전부 |
 | `verify [-orig 원본] [-allow 위치.txt] [-banned 금지어.txt] <파일>` | 원본 대비 바뀐 곳, 사라진 메모·표·그림·변경 추적, 금지어, em dash. 위반이면 종료 코드 1. 5절 | 전부 |
-| `convert [-to hwp\|hwpx\|pdf\|txt] [-o 출력] [-force] [-engine builtin\|hancom] <입력>` | 기본은 why-hwp 에 든 엔진(rhwp)으로 변환한다. hwp ↔ hwpx 는 한글과 같은 결과다. PDF 는 한글 인쇄의 근사라 모양 확인용이다 (아래). `-engine hancom` 은 설치된 한컴오피스로 변환해 한글 인쇄와 똑같은 PDF 를 만들고 `.docx` 도 받는다. 출력이 있으면 `-force` 없이는 안 덮어쓴다 | 전부. `-engine hancom` 은 한글이 깔린 Windows |
+| `convert [-to hwp\|hwpx\|pdf\|txt] [-o 출력] [-force] [-engine builtin\|hancom] <입력>` | 기본은 why-hwp 에 든 엔진(rhwp)으로 변환한다. hwp ↔ hwpx 는 한글과 같은 결과고 변경 추적과 메모도 옮긴다. PDF 는 한글 인쇄의 근사라 모양 확인용이다 (아래). `-engine hancom` 은 설치된 한컴오피스로 변환해 한글 인쇄와 똑같은 PDF 를 만들고 `.docx` 도 받는다. 출력이 있으면 `-force` 없이는 안 덮어쓴다 | 전부. `-engine hancom` 은 한글이 깔린 Windows |
+| `render [-pages 1-3] [-dpi 150] [-o 폴더] [-force] <입력.hwp\|.hwpx>` | 쪽마다 PNG 한 장을 why-hwp 에 든 엔진으로 그린다. `convert -to pdf` 와 같은 글꼴·줄바꿈·쪽나눔이라, 모양은 PDF 를 거치지 않고 이 그림을 Read 로 본다. 파일은 `<입력 이름>-p001.png` (기본은 입력 폴더), A4 는 150dpi 에서 1240x1752 px. 있는 PNG 는 `-force` 없이 안 덮어쓴다 | 전부 |
 | `svg2png`, `svgfont`, `svgcheck` | 그림. `figures.md` 9절. `svg2png` 는 why-hwp 에 든 엔진으로 그려 브라우저가 필요 없다 | 전부 |
 | `version` | 버전 | 전부 |
 
@@ -35,10 +36,11 @@ WH=$(bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh --which) || echo "
 | `original` | 모두 거절한 글. **지운 글이 파일 안에 아직 남아 있는지 볼 때 쓴다** |
 | `markup` | 넣은 글 `[+글+]`, 지운 글 `[-글-]` |
 
-`.hwp` 도 `text`·`info`·`verify` 로 바로 읽는다. 다만 변경 추적이 든 `.hwp` 는 보기를 나누지 못해 지운 글과 넣은 글이 섞여 나온다.
-**`.hwp` 는 `apply` 에 그대로 넣어도 된다.** why-hwp 에 든 엔진이 hwpx 로 바꾼 뒤 고치고, 결과는 hwpx 다. 바꾸면서 빠지는 것이 있을 수 있어 `verify -orig 원본.hwp 결과.hwpx` 로 본다.
+`.hwp` 도 `text`·`info`·`verify` 로 바로 읽고, 변경 추적이 든 `.hwp` 도 `-view` 로 나눠 본다. 위치는 엔진이 바꾼 hwpx 와 같다.
+**`.hwp` 는 `apply` 에 그대로 넣어도 된다.** why-hwp 에 든 엔진이 hwpx 로 바꾼 뒤 고치고, 결과는 hwpx 다. 변경 추적과 메모는 그대로 옮겨진다. 다른 것은 바꾸면서 빠질 수 있어 `verify -orig 원본.hwp 결과.hwpx` 로 본다.
+**결과의 변경 추적이 원본 수(`apply` 는 여기에 이번 편집 수를 더한 것)보다 적으면 `convert`·`apply` 는 결과를 쓰지 않고 1 로 끝난다.** 그 메시지가 나오면 넘기지 말고 사용자에게 알린다.
 
-**PDF 는 모양 확인용이다.** 기본 엔진의 PDF 는 한글 인쇄와 아주 가깝지만 같지는 않다. 문서의 글꼴(한컴·Windows 글꼴)이 없는 PC 에서는 대신 쓰는 글꼴 때문에 글자 위치가 1~2pt 쯤 어긋날 수 있다. 표가 깨졌는지, 쪽이 밀렸는지, 그림이 영역 안에 있는지는 볼 수 있다. 한글과 똑같은 PDF 가 필요하면 한글이 깔린 Windows 에서 `-engine hancom` 으로 만든다.
+**PDF 와 `render` 그림은 모양 확인용이다.** 기본 엔진의 PDF 는 한글 인쇄와 아주 가깝지만 같지는 않다. 문서의 글꼴(한컴·Windows 글꼴)이 없는 PC 에서는 대신 쓰는 글꼴 때문에 글자 위치가 1~2pt 쯤 어긋날 수 있다. 표가 깨졌는지, 쪽이 밀렸는지, 그림이 영역 안에 있는지는 볼 수 있다. 한글과 똑같은 PDF 가 필요하면 한글이 깔린 Windows 에서 `-engine hancom` 으로 만든다.
 
 ## 3. 작업 순서
 
@@ -46,7 +48,7 @@ WH=$(bash ~/.claude/skills/doc-write/scripts/fetch-why-hwp.sh --which) || echo "
 |---|-------|-----------|
 | 1 | 원본을 복사한다. 원본은 고치지 않는다 | 사본 이름은 폴더 파일명 규칙의 다음 버전 |
 | 2 | 구조와 글을 뽑는다 | `"$WH" info 원본`, `"$WH" text 원본 > 원본.txt`. 메모 수, 변경 추적 수, 담당 표기를 적어 둔다 |
-| 3 | 모양을 본다 | `"$WH" convert -to pdf -o 원본.pdf 원본` 후 Read 로 쪽을 본다 |
+| 3 | 모양을 본다 | `"$WH" render -o <쪽그림 폴더> 원본` 후 Read 로 PNG 를 본다. 쪽이 많으면 `-pages 1-5` 처럼 나눠 그린다 |
 | 4 | 분석·질문 (`questions.md`) | 변경 추적 저자 이름(`-author`)도 이때 묻는다. 한글 검토 화면에 그대로 보인다 |
 | 5 | `.hwp` 면 hwpx 사본을 만든다 | `"$WH" convert -to hwpx -o 사본.hwpx 원본.hwp`. 위치는 **이 사본의** `text` 로 다시 뽑는다. `apply` 에 `.hwp` 를 바로 넣어도 되지만 사본을 두면 무엇을 고쳤는지 비교하기 쉽다 |
 | 6 | 그림을 만든다 | `figures.md` 9절: `svgfont` → `svgcheck` → `svg2png -width-mm <영역 mm>` |
@@ -75,9 +77,15 @@ hwpx 의 XML 을 손으로 고치지 않는다. `apply` 가 아래를 대신 한
   {"op": "replace", "loc": "s0/p7", "find": "옛 표현", "with": "새 표현"},
   {"op": "insert_after", "loc": "s0/p1", "paras": [{"text": "1.1 목적", "like": "s0/p1"}]},
   {"op": "delete", "loc": "s0/p5"},
-  {"op": "image", "after": "s0/p9", "src": "그림1.png", "width_mm": 150}
+  {"op": "image", "after": "s0/p9", "src": "그림1.png", "width_mm": 150},
+  {"op": "set_text", "loc": "s0/p12", "text": "강조할 글", "char_shape": "s0/p3"},
+  {"op": "delete_memo", "loc": "s0/p20", "find": "메모 글 일부"}
 ]}
 ```
+
+`char_shape` 는 `set_text`·`insert_after`·`insert_before` 에 붙여, 새 글이 그 위치(글 있는 첫 조각)의 글자 모양을 쓰게 한다. 문서에 이미 있는 글자 모양만 쓸 수 있다.
+`delete_memo` 는 메모를 지운다. `loc` 은 `info` 가 그 메모를 적은 문단이고, `find` 는 한 문단에 메모가 여럿일 때 고르는 메모 글 일부다.
+**메모 삭제는 변경 추적으로 남지 않는다** (한글도 남기지 않는다). 거절로 되살릴 수 없으니 지우기 전에 사용자에게 묻고, 5절의 `-allow` 파일에 `memo:<위치>` 를 넣는다.
 
 `src` 는 명세 파일 기준 경로다. 명세 파일은 산출물 폴더에 둔다 (스크래치패드에 두지 않는다).
 
@@ -92,11 +100,11 @@ hwpx 의 XML 을 손으로 고치지 않는다. `apply` 가 아래를 대신 한
 | 검사 | 어떻게 |
 |------|--------|
 | 남의 글이 그대로인가 | `"$WH" verify -orig 원본 -allow 우리칸.txt 결과.hwpx`. `우리칸.txt` 는 이번에 고쳐도 되는 위치 목록 (`s0/p4/t0/*` 는 접두사). 목록 밖이 바뀌면 위반 |
-| 메모 | `info` 의 메모 수가 원본과 같다. `verify -orig` 는 메모가 사라지면 위반을 낸다 |
+| 메모 | `info` 의 메모 수가 원본과 같다. `verify -orig` 는 메모가 사라지거나 메모 끝 표시가 빠지면 위반을 낸다. `delete_memo` 로 일부러 지운 메모는 `-allow` 파일에 `memo:<위치>` 줄로 허용한다 |
 | 변경 추적 | **두 조건을 따로 본다.** (1) 원본에 있던 변경 추적이 하나도 사라지지 않았다: `verify -orig` 가 위반을 안 낸다. (2) 이번 편집이 새 변경 추적으로 남았다: `info` 의 변경 추적 수가 원본보다 늘었고, `text -view markup` 에서 고친 위치에 `[+ +]`·`[- -]` 가 보인다. 수가 원본과 같으면 편집이 추적되지 않은 것이다 |
 | 금지어·em dash | `-banned 금지어.txt` (내부 이름 목록을 넣는다). em dash 는 항상 위반 |
 | 열리나 | `"$WH" convert -to pdf` 가 끝까지 되고, PDF 마지막 쪽에 원본 마지막 쪽 글이 있는지. 한글로 여는지까지 보려면 한글이 깔린 Windows 에서 `-engine hancom` 으로 한 번 더 |
-| 그림·모양 | PDF 를 원본 PDF 와 나란히 보고 그림이 영역 안에 있는지, 표가 깨지거나 쪽이 밀리지 않았는지. 두 PDF 는 같은 엔진으로 만든다 (글꼴 차이로 생기는 어긋남이 양쪽에 같이 나서 비교가 된다) |
+| 그림·모양 | 원본과 결과를 같은 엔진으로 `render` 해 쪽 그림을 나란히 보고, 그림이 영역 안에 있는지, 표가 깨지거나 쪽이 밀리지 않았는지 본다. 같은 엔진으로 그려야 글꼴 차이로 생기는 어긋남이 양쪽에 같이 나서 비교가 된다 |
 
 ### 공개·외부 제출본
 
@@ -106,7 +114,7 @@ hwpx 의 XML 을 손으로 고치지 않는다. `apply` 가 아래를 대신 한
 |---------|---------|
 | 메모 본문 | `info` 가 메모 글을 보여 준다. 내부 이름이 있으면 사용자에게 알린다. 남의 메모를 지우는 것은 사용자가 정한다 |
 | 지운 글 (변경 추적) | `text -view original` 로 grep. 수락하기 전까지 지운 글은 파일에 남는다 |
-| 머리말·꼬리말·각주 | why-hwp 가 뽑지 않는다. PDF 로 바꿔 눈으로 본다. 못 보면 "확인 못 함" 으로 보고 |
+| 머리말·꼬리말·각주 | why-hwp 가 뽑지 않는다. `render` 로 쪽 그림을 그려 눈으로 본다. 못 보면 "확인 못 함" 으로 보고 |
 | 그림 속 글자 | grep 에 안 잡힌다. 그림 파일을 하나씩 연다 (`writing.md` 4절) |
 
 변경 추적과 메모를 그대로 둔 채로는 공개본이 되지 않는다. **작업본과 공개본을 나눈다.** 공개본은 사용자가 한글에서 변경 내용을 모두 적용하고 메모를 정리한 뒤(또는 PDF 로) 만들고, 그 파일로 위 검사를 다시 한다.
